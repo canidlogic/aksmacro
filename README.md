@@ -109,3 +109,28 @@ These requirement macros will only check the mode on the Win32 platform.  They a
     #include "aksmacro.h"
     
     /* Windows in Unicode mode only */
+
+## Binary and text modes
+
+The standard C I/O library `<stdio.h>` has the concept of text mode versus binary mode for file handles.  On POSIX, there is no difference between these two modes.  However, on Windows, text mode may attempt to translate between UNIX-style LF line breaks and DOS-style CR+LF line breaks.  If you are working with binary files, it is important on Windows (but not on POSIX) to make sure the file mode is binary rather than text, so that bytes that happen to have the LF character code don't get replaced by CR+LF sequences.
+
+Since these two modes are part of the C standard, you can generally just use the portable `fopen()` function to specify the correct mode when opening a file.
+
+The one catch is handling the standard I/O streams, which are already open when the program starts.  In Windows, these are probably opened in text mode, so if you are reading a binary file from standard input or writing a binary file to standard output, you will have to change the file mode from text to binary, but there is no obvious way to do this with the C standard library.
+
+The standard C library on Windows provides extension functions that are able to change the file mode of an open file.  Specifically, `_fileno()` is used to get the file descriptor number of a `FILE *` handle such as `stdin` or `stdout` and then `_setmode()` is used to change the mode of that handle.
+
+The `aksmacro.h` header can include portable macro wrappers for this functionality if you specify the `AKS_REQUIRE_BINMODE` macro before including the `aksmacro.h` header.  This will define two macros `aks_binmode()` and `aks_textmode()` if they are not already defined.  Both take a single parameter that is the `FILE *` handle to modify, and both return -1 if setting the mode failed or some other value if setting the mode succeeded.  On POSIX, both of these macros always just return the value 1 because there is no difference between binary mode and text mode on POSIX.  On Windows, the `_setmode()` function will be invoked with the `_fileno()` of the handle and the appropriate mode constant.  The Windows implementation will also pull in the correct headers.  Example:
+
+    #define AKS_REQUIRE_BINMODE
+    #include "aksmacro.h"
+    
+    if (aks_binmode(stdin) == -1) {
+      fprintf(stderr, "Failed to set standard input to binary!\n");
+    }
+    
+    if (aks_textmode(stdout) == -1) {
+      fprintf(stderr, "Failed to set standard output to text!\n");
+    }
+
+You should only change the mode at the beginning before reading or writing any data from the handle.
