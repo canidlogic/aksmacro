@@ -68,6 +68,8 @@ To get portable 64-bit file support with `aksmacro.h`, define the macro `AKS_FIL
 
 Note that `fseekw()` `ftellw()` and `aks_off64` are only defined if you define `AKS_FILE64` before including the header.  However, if either the `fseekw` or `ftellw` macros are already defined before the header is included, the header will assume everything is already set up and define none of these three entities even if `AKS_FILE64` is defined.
 
+Specifying `AKS_FILE64` will automatically `#include <stdio.h>`
+
 ## Unicode and ANSI modes
 
 The C language was defined long before Unicode existed, so it does not have mandated support for Unicode.  Traditionally, the interpretation of characters in C was based on locales.  Eventually, POSIX systems added support for Unicode by encoding it with UTF-8 and considering UTF-8 to be a special sort of "locale."  Portable C programs in many cases can be written carefully to not assume things about the specific locale, allowing the program to function correctly regardless of what locale is in use and whether or not UTF-8 is supported by the environment.
