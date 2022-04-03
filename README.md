@@ -83,7 +83,7 @@ In order to use these translation macros, you must define `AKS_TRANSLATE` before
     fh = fopent("example.txt", "rb");
     ...
 
-Using `AKS_TRANSLATE` will cause `aksmacro.h` to `#include` the `stdio.h` and `stdlib.h` headers, as well as possibly `windows.h` on Windows.
+Using `AKS_TRANSLATE` will cause `aksmacro.h` to `#include` the `stddef.h` `stdio.h` `stdlib.h` and `string.h` headers, as well as possibly `windows.h` on Windows.
 
 Besides using the translation macros in place of the corresponding ANSI C functions, the other thing you should do in translated mode is use the translated `main` function.  To do this, rename your `main` function to `maint`, add a `static` modifier, make sure you are using the two-argument form of `main` that returns an integer, and define `AKS_TRANSLATE_MAIN` before including `aksmacro.h` header &mdash; but only in the module that includes the translated `maint` function.  Example:
 
@@ -105,6 +105,8 @@ When using the translation macro wrappers and the translated `maint` function, i
 The difference arises when `UNICODE` and `_UNICODE` are both defined during compilation on the Windows platform.  First off, if `AKS_TRANSLATE_MAIN` or `AKS_TRANSLATE` is defined when the `aksmacro.h` header is included on Windows, a check will be made that `_MBCS` is not defined, and that either both `UNICODE` and `_UNICODE` are defined, or neither `UNICODE` nor `_UNICODE` are defined.  (If neither are defined, we are in ANSI mode, and the trivial wrappers described above are used instead.)
 
 In Unicode mode, the translation functions will make copies of string parameters that have the string arguments translated from UTF-8 to UTF-16 using the Windows function `MultiByteToWideChar`.  Translation functions that return a string will translate the returned string from UTF-16 back to UTF-8 using the Windows function `WideCharToMultiByte` and then store a pointer to that buffer in a statically allocated pointer location defined by `aksmacro.h`, with any previous buffer stored there freed before writing the new one.
+
+Faults (`abort()`) occur if there are any problems with translation between UTF-8 and UTF-16.  This means that if you don't want a fault but the encoding of a parameter might not be reliable, you should check the parameter before passing it through to the wrapper functions.
 
 Also in Unicode mode, when `AKS_TRANSLATE_MAIN` is used, the `aksmacro.h` header will define a Windows-specific `wmain` function that accepts parameters in UTF-16.  This `wmain` function will then translate its arguments from UTF-16 to UTF-8 using the Windows function `WideCharToMultiByte` and then invoke the `maint` function using the translated UTF-8 parameters.
 
@@ -144,7 +146,7 @@ Second, the following two functions are defined:
 
 These are actual `static` functions that are declared by the `aksmacro.h` header.  Both create a new dynamically allocated copy of their given argument, translating between generic `aks_tchar` strings and 8-bit `char` strings.  However, if NULL is passed to either of these functions, NULL is returned.  If a non-NULL pointer is returned, it should eventually be released with `free()`.
 
-On POSIX and on Windows in ANSI mode, these functions just make a dynamic string copy and return it.  On Windows in Unicode mode, these functions convert between UTF-16 used by the `aks_tchar` string and UTF-8 used by the `char` string.
+On POSIX and on Windows in ANSI mode, these functions just make a dynamic string copy and return it.  On Windows in Unicode mode, these functions convert between UTF-16 used by the `aks_tchar` string and UTF-8 used by the `char` string.  If conversion fails, a fault (`abort()`) occurs.
 
 ## ANSI C support
 
@@ -268,7 +270,7 @@ If you define the macro `AKS_BINMODE` before including `aksmacro.h`, the header 
     
       -1 if error, something else otherwise
 
-The `AKS_BINMODE` declaration will also cause `aksmacro.h` to `#include` the `stdio.h` header, and on Windows also the `io.h` and `fcntl.h` headers.  On POSIX, these functions simply return 1 and do nothing else because there is no difference between text and binary modes on POSIX.  On Windows, the `_setmode()` and `_fileno()` extension functions will be used to explicitly set the mode on the streams.  Example:
+The `AKS_BINMODE` declaration will also cause `aksmacro.h` on Windows to `#include` the `stdio.h` `io.h` and `fcntl.h` headers.  On POSIX, these functions simply return 1 and do nothing else because there is no difference between text and binary modes on POSIX.  On Windows, the `_setmode()` and `_fileno()` extension functions will be used to explicitly set the mode on the streams.  Example:
 
     #define AKS_BINMODE
     #include "aksmacro.h"
@@ -281,7 +283,7 @@ The `AKS_BINMODE` declaration will also cause `aksmacro.h` to `#include` the `st
       fprintf(stderr, "Failed to set standard output to text!\n");
     }
 
-You should only change the mode at the beginning before reading or writing any data with the handle.
+You should only change the mode at the beginning before reading or writing any data with the handle.  Also, since these functions are macros, avoid anything that has side-effects with the parameters, such as the `++` increment.
 
 ### 64-bit file support
 
