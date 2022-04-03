@@ -2,17 +2,19 @@
 
 Macro routines for Arctic Kernel Services.  This project contains a single C header file `aksmacro.h` that can be used for specific purposes described below in this README.  There is no implementation file to compile; to use `aksmacro` just include the `aksmacro.h` header in your project.  You may include the header however many times you want.
 
+Using `aksmacro.h` you can write C programs that are portable between POSIX and Windows with minimal overhead, provided that you follow the guidelines and limitations outlined in this README.  If you need further portability beyond what `aksmacro.h` offers, you can either add your own extensions (made easier by the platform determination macros of `aksmacro.h`) or switch to a more sophisticated solution, such as Cygwin.
+
 ## Platform determination
 
-The two main platform targets in use these days are Win32 and POSIX.  Win32 is used by Microsoft Windows, and (confusingly) Win32 is also used in 64-bit Windows, though it's sometimes called Win64 there.  Win32 is traditionally supported by all Microsoft Windows operating systems from Windows 95 and Windows NT up to the present (Windows 11 at time of writing).  The by now ancient 16-bit Windows 3.x systems that ran on DOS are _not_ supported by Win32.  Also, recently Microsoft has started using the Windows name for some mobile platforms that do not include Win32 support, such as Windows RT and Universal Windows Platform (UWP).
+The two main platform targets in use these days are WinAPI and POSIX.  WinAPI is used by Microsoft Windows, and has been traditionally supported by all 32-bit and 64-bit Microsoft Windows operating systems from Windows 95 and Windows NT up to the present (Windows 11 at time of writing).  The ancient 16-bit Windows 3.x and earlier platforms that ran on top of DOS are _not_ supported by WinAPI.  Also, sometimes Microsoft uses the Windows name for mobile or embedded platforms that do not include full WinAPI support, such as Windows RT and Universal Windows Platform (UWP).
 
-POSIX is used on most other platforms that are not Windows.  UNIX and UNIX-like operating systems, Linux, BSD, and Solaris are all POSIX platforms.  MacOS operating systems since OS X are also POSIX, though the historic "classic Mac OS" (last updated in 2001) is not POSIX.  Although mobile platforms such as Android and iOS might be built on top of POSIX kernels, the mobile interface tends not to work well for C-style console applications, so generally mobile applications for Android and iOS will _not_ be written directly against the POSIX kernel.  Finally, DOS is not POSIX.
+POSIX is used on most other platforms that are not Windows.  UNIX and UNIX-like operating systems, Linux, BSD, and Solaris are all POSIX platforms.  MacOS operating systems since OS X are also POSIX, though the historic "classic Mac OS" (last updated in 2001) is not POSIX.  Although mobile platforms such as Android and iOS might be built on top of POSIX kernels, the mobile interface tends not to work well for C-style console applications, so generally mobile applications for Android and iOS will _not_ be written directly against the POSIX kernel.  Also, DOS is not POSIX.
 
-The `aksmacro.h` header is only designed to work on Win32 (and Win64) and POSIX platforms.  Its behavior is undefined if you include it when compiling for other platforms.
+The `aksmacro.h` header is only designed to work on WinAPI and POSIX platforms.  Its behavior is undefined if you include it when compiling for other platforms.
 
-The first thing the header does is to determine whether it is on Win32 or POSIX.
+The first thing the header does is to determine whether it is on WinAPI or POSIX.
 
-To do this, it checks for the presence of any of the following Win32 macro definitions:
+To do this, it checks for the presence of any of the following WinAPI macro definitions:
 
 - `_WIN32`
 - `_WIN64`
@@ -20,9 +22,9 @@ To do this, it checks for the presence of any of the following Win32 macro defin
 - `__TOS_WIN__`
 - `__WINDOWS__`
 
-If any of these five macros are defined, the platform is Win32.  If none of them are defined, the platform is assumed to be POSIX.  The five macro definitions shown above are from the "Pre-defined Compiler Macros" project at https://sourceforge.net/projects/predef/
+If any of these five macros are defined, the platform is WinAPI.  If none of them are defined, the platform is assumed to be POSIX.  The five macro definitions shown above are from the "Pre-defined Compiler Macros" project at https://sourceforge.net/projects/predef/
 
-If AKS determines the platform is Win32, it will define the macro `AKS_WIN` if not already defined.  If AKS determines the platform is POSIX, it will define the macro `AKS_POSIX` if not already defined.  Finally, it will make sure that `AKS_WIN` and `AKS_POSIX` are not both defined at the same time.  Example:
+If AKS determines the platform is WinAPI, it will define the macro `AKS_WIN` if not already defined.  If AKS determines the platform is POSIX, it will define the macro `AKS_POSIX` if not already defined.  Finally, it will make sure that `AKS_WIN` and `AKS_POSIX` are not both defined at the same time.  Example:
 
     #include "aksmacro.h"
     
@@ -34,7 +36,7 @@ If AKS determines the platform is Win32, it will define the macro `AKS_WIN` if n
     /* POSIX-specific code */
     #endif
 
-If your code only supports Win32 or only supports POSIX, you can define `AKS_REQUIRE_WIN` or `AKS_REQUIRE_POSIX` before including the header.  The header will then check that the platform matches the stated requirement or cause a compilation error otherwise:
+If your code only supports WinAPI or only supports POSIX, you can define `AKS_REQUIRE_WIN` or `AKS_REQUIRE_POSIX` before including the header.  The header will then check that the platform matches the stated requirement or cause a compilation error otherwise:
 
     #define AKS_REQUIRE_WIN
     #include "aksmacro.h"
@@ -45,6 +47,148 @@ If your code only supports Win32 or only supports POSIX, you can define `AKS_REQ
     #include "aksmacro.h"
 
 The platform check is done at the time the header is included.  It is an error if both `AKS_REQUIRE_WIN` and `AKS_REQUIRE_POSIX` are defined at the same time when the header is included.
+
+## ANSI C support
+
+If you are writing C programs that seek to be portable between POSIX and WinAPI, you should stay as close as possible to ANSI C (C89/C90).  Microsoft has traditionally been very slow at updating C language support in their compilers.  Furthermore, there are certain sections of the ANSI C standard that are problematic and should be avoided in modern applications, even if they are part of the ANSI C standard.
+
+The following subsections have specifics about what parts of ANSI C to avoid.
+
+### Unsafe string reading
+
+The ANSI C function `gets()` is highly vulnerable to buffer overruns.  POSIX standards discourage use of this function for that reason.  Microsoft has dropped the function entirely due to security concerns.
+
+In short, do not use `gets()`!
+
+### Locale-related functions
+
+ANSI C was defined before Unicode existed.  As such, it has its own system of "locales" for handling different character sets and international characters.  ANSI C also has a system of "wide characters" that can convert between multibyte encodings such as Shift-JIS and extended character codes.
+
+For modern applications, you should either limit the application to US-ASCII, or use Unicode.  Do not use the legacy locale functions, and do not use the wide characters.
+
+The following functionality should therefore be avoided (sorted by relevant header):
+
+    <stddef.h>
+    - Do not use the wchar_t wide character definition.
+    - Use US-ASCII or UTF-8 instead.
+    
+    <ctype.h>
+    - Do not use this header.
+    - Use US-ASCII definitions or Unicode definitions instead.
+    
+    <locale.h>
+    - Do not use this header.
+    - Use US-ASCII definitions or Unicode definitions instead.
+    
+    <stdio.h>
+    - Use only US-ASCII with printf and scanf function families.
+    
+    <stdlib.h>
+    - Do not use the following text conversion functions:
+      + mblen()
+      + mbstowcs()
+      + mbtowc()
+      + wcstombs()
+      + wctomb()
+    - Use UTF-8 instead.
+    
+    <string.h>
+    - Do not use the following locale functions:
+      + strcoll()
+      + strxfrm()
+    - Use Unicode collation instead.
+
+On modern platforms, you should be able to assume with great confidence that the basic 7-bit character set is US-ASCII.  The only exceptions would be legacy multibyte environments such as Shift-JIS that may make a few character substitutions within the ASCII block, and EBCDIC.  Therefore, you can easily make your own implementations of the C locale-type functions using US-ASCII, and that should work on both Windows and POSIX.
+
+Unicode support is much more involved, but it will work the same way on both Windows and POSIX.  There are portable libraries available that can help with various aspects of Unicode implementation.
+
+### Platform quirks
+
+When using compilers such as GCC, you may need to include a math library with `-lm` if you use math functions from `<math.h>`.  On Windows, the math functions are included within the standard C library, so you should not need to include any extra libraries.
+
+WinAPI doesn't have the concept of signals, so it's a good idea to avoid the use of `<signal.h>` when writing portable code.
+
+### WinAPI ANSI and Unicode modes
+
+For historical reasons, WinAPI has a convoluted system of different text handling modes.  On the fundamental WinAPI level, most key functions that accept string parameters have two different versions, an `A` version that accepts 8-bit strings and a `W` version that accepts 16-bit wide-character strings.  In the C standard library implementation, there are a number of Windows-specific wide-character variants of various functions and also special multibyte variants for handling legacy non-Unicode multibyte encodings.  On top of this, there is a "generic" system for both the WinAPI and the C standard library that allows the same code to work with both 8-bit strings and 16-bit wide-character strings based on what macros are provided during compilation.
+
+None of these convoluted modes or variant functions exist on POSIX.  Modern POSIX can just use 8-bit UTF-8 with the standard functions.  Things would be easy if WinAPI would allow you to use UTF-8 with its 8-bit functions, but unfortunately you must use the 16-bit wide-character functions to get full Unicode support on WinAPI.
+
+`aksmacro.h` attempts to provide a practical approach to portability in the following manner.  
+
+First of all, the official WinAPI docs consider the multibyte character extensions to be historic, so `aksmacro.h` will check for the `_MBCS` macro definition and fail if it is present, thereby preventing the multibyte mode.  One less thing to worry about.
+
+Second, `aksmacro.h` will check that either both `UNICODE` and `_UNICODE` are defined, or that neither are defined.  The `UNICODE` macro switches WinAPI from `A` functions to `W` functions, while the `_UNICODE` macro switches the C standard library generics to wide characters.  It's a good idea to have consistent generics in both WinAPI and the C standard library, which is why you must either use wide characters in both or wide characters in neither.
+
+Third, `aksmacro.h` will typedef a generic character type, `aks_tchar`.  On POSIX, this type is always equivalent to `char`.  On Windows, this type is equivalent to `_TCHAR` which is either 8-bit or 16-bit depending on whether or not `_UNICODE` is defined.  (On Windows, the `<tchar.h>` header will always be imported by `aksmacro.h`)
+
+Fourth, `aksmacro.h` will define two macro functions, `aks_toapi()` and `aks_fromapi()` that can perform string conversions.  The function descriptions are given below:
+
+    aks_tchar *aks_toapi(const char *pStr)
+    --------------------------------------
+    
+    Parameters:
+    
+      pStr - pointer to an (8-bit) string to convert
+    
+    Return:
+    
+      newly allocated generic string copy
+    
+    ===
+    
+    char *aks_fromapi(const aks_tchar *pStr)
+    ----------------------------------------
+    
+    Parameters:
+    
+      pStr - pointer to a generic string to convert
+    
+    Return:
+    
+      newly allocated 8-bit string copy
+
+On POSIX and in Windows in ANSI mode, both of these functions simply dynamically allocate a new buffer, copy the string as-is into the buffer, and return the new string copy.  In Windows in Unicode mode, the WinAPI functions `MultiByteToWideChar` and `WideCharToMultiByte` are used to convert between UTF-8 in 8-bit strings and UTF-16 in wide-character strings.
+
+The returned string copy should eventually be freed with `free()`.  If NULL is passed to either of these macro functions, NULL will be returned.
+
+__Caution:__ Since these are macro functions, the argument must not have any side effects.
+
+Fifth, for all of the following standard C functions, `aksmacro.h` will define a macro wrapper with names shown below:
+
+    <stdio.h>
+    remove  -> removet
+    rename  -> renamet
+    tmpnam  -> ttmpnam (*)
+    fopen   -> fopent
+    freopen -> freopent
+    
+    <stdlib.h>
+    getenv  -> tgetenv (*)
+    system  -> systemt
+
+All macro wrappers except those marked with `(*)` have the exact same interface as their corresponding library functions, except that their arguments must not have any side effects due to their macro nature.  The macro wrappers marked with `(*)` have a slightly different interface than the standard functions.  Instead of returning a pointer to a value in a static buffer that shouldn't be freed, they return a dynamically allocated string copy that _should_ eventually be freed with `free()`.
+
+On POSIX and on Windows in ANSI mode, the macro wrappers just call directly through to the corresponding standard library functions.  However, the functions marked with `(*)` will afterwards make a dynamically allocated copy of the return value and then return a pointer to this copy, unless the return value is NULL in which case NULL is returned.
+
+On Windows in Unicode mode, the macro wrappers will first convert any string arguments to UTF-16 using the `aks_toapi()` macro defined earlier.  The Windows-specific wide-character version of the library function will then be invoked using the UTF-16 parameter copies.  Once the function returns, the UTF-16 copies will be released.  For the functions marked with `(*)`, their return argument will be converted back to UTF-8 using `aks_fromapi()` and then this conversion will be returned.
+
+Sixth, `aksmacro.h` will define a `main()` function if you declare `AKS_MAIN` before importing the header.  The header will undefine `AKS_MAIN` when finished so that this definition only applies once.  Prior to doing this, you should define your actual `main()` function with the same interface as usual, except call it `maint()` instead.  The `main()` function defined by `aksmacro.h` will call into this main function:
+
+    #include "aksmacro.h"
+    
+    ...
+    
+    int maint(int argc, char *argv[]) {
+      /* Your main function here */
+    }
+    
+    #define AKS_MAIN
+    #include "aksmacro.h"
+
+On POSIX and on Windows in ANSI mode, the macro-defined `main()` function will just call through to the `maint()` function.  On Windows in Unicode mode, the macro-defined `main()` function will use the Windows-specific `wmain()` function to receive its arguments in UTF-16.  Then, it will rebuild the argument array with UTF-8 versions of all arguments.  Finally, it will call the `maint()` function using the UTF-8 conversions.
+
+The recommended strategy is therefore to always use the wrapper macros for the relevant standard library functions shown above, bearing in mind the different interface for the functions marked `(*)`, and also to use the macro wrapper for `main()` as demonstrated above.  When compiling on POSIX and on Windows in ANSI mode, this adds a negligible amount of overhead.  When compiling on Windows in Unicode mode, this almost transparently allows you to use UTF-8.
 
 ## 64-bit file support
 
@@ -69,46 +213,6 @@ To get portable 64-bit file support with `aksmacro.h`, define the macro `AKS_FIL
 Note that `fseekw()` `ftellw()` and `aks_off64` are only defined if you define `AKS_FILE64` before including the header.  However, if either the `fseekw` or `ftellw` macros are already defined before the header is included, the header will assume everything is already set up and define none of these three entities even if `AKS_FILE64` is defined.
 
 Specifying `AKS_FILE64` will automatically `#include <stdio.h>`
-
-## Unicode and ANSI modes
-
-The C language was defined long before Unicode existed, so it does not have mandated support for Unicode.  Traditionally, the interpretation of characters in C was based on locales.  Eventually, POSIX systems added support for Unicode by encoding it with UTF-8 and considering UTF-8 to be a special sort of "locale."  Portable C programs in many cases can be written carefully to not assume things about the specific locale, allowing the program to function correctly regardless of what locale is in use and whether or not UTF-8 is supported by the environment.
-
-The situation is very different on Windows.  When the Win32 architecture was developed, there were two separate lines of Windows operating systems:  Windows 9x (which includes Windows 95, Windows 98, and Windows Me), and Windows NT (which includes Windows 2000, Windows XP, Windows 7, Windows 8, Windows 10, and Windows 11).  The Windows 9x line is now historic and only the Windows NT line is still active, but the effect of this split is still apparent in the Win32 API.
-
-The Windows 9x line only supported a locale-based system, known in Windows terminology as "ANSI".  The Windows NT line supported both the locale-based ANSI system as well as a new Unicode system.  However, the Unicode system in Windows NT is based on UCS-2 (later upgraded to UTF-16), which uses "wide" characters that are 16-bit instead of the 8-bit characters in ANSI mode (and UTF-8).
-
-The problem is that 16-bit wide characters break compatibility with standard C because the underlying 16-bit data type is no longer compatible with the 8-bit `char` type used through standard C.  The Win32 solution is to create two versions of each function that handles strings.  The ANSI version (suffixed with `A`) accepts 8-bit character strings while the Unicode version (suffixed with `W`) accepts 16-bit (wide) character strings.  Therefore, for example, the Win32 API call to create or open a file is either `CreateFileA` in ANSI mode or `CreateFileW` in Unicode mode.  The difference between these two functions has _nothing_ to do with whether Unicode or ISO-8859-1 or binary data will be stored within the file.  Rather, the only difference is that `CreateFileA` accepts the string parameter holding the file path as an 8-bit character string, while `CreateFileW` accepts the string parameter holding the file path as a 16-bit wide character string.
-
-Instead of directly calling the ANSI or Unicode version of a Win32 API function, however, the preferred method is instead to call the function without the `A` or `W` suffix attached.  Therefore, Windows code would call `CreateFile` instead of directly calling `CreateFileA` or `CreateFileW`.  By default, the ANSI version of functions is invoked.  However, if the macro `UNICODE` is defined during compilation, the Unicode version of functions will be invoked instead.  Microsoft's idea was to let the exact same code compile for both ANSI and Unicode mode, so that back in the day you could compile separate Windows 95 and Windows NT versions just by specifying `UNICODE` when compiling the Windows NT version and leaving out that macro when compiling the Windows 95 version.
-
-In order to get this dual-system code to work correctly, you have to make careful use of generic data types such as `TCHAR` and `LPTSTR` that change their definitions depending on whether or not `UNICODE` is defined during compilation.  These types are, of course, specific to Windows.
-
-This dual ANSI/Unicode system bubbles up and also affects the C standard library.  Here again, Microsoft supplements the standard C functions, which are all based on 8-bit characters, with their own Windows-specific functions that are wide-character alternatives.  Once again, there is a generic type system that is intended to make it possible to write code that works on both ANSI and Unicode systems.  This time, however, you need to define a different macro `_UNICODE` (note the underscore at the start) to switch the C standard library to Unicode mode during compilation.  Plus, there are multibyte character versions of functions, intended for locales that have non-Unicode varying-length characters.
-
-The whole dual ANSI/Unicode system is a huge headache when attempting to write portable code that works on both POSIX and Windows.  The most practical option is probably to just use the default ANSI system (neither specifying `UNICODE` nor `_UNICODE` when compiling), as the ANSI system is standard and works the same on POSIX.  Programs written in ANSI mode may lack support for Unicode used in file paths and Unicode displayed in the console window, but they can still internally use Unicode and interact with Unicode data files the same way as on POSIX.  If you want full Unicode support on Windows, the practical options are either to write a version specific to Windows or to develop a full abstraction layer on top of any system call that uses string parameters.
-
-On the Win32 platform only, the `aksmacro.h` header will check that either both `UNICODE` or `_UNICODE` are defined, or that neither are defined, which makes sure that the interpretation used by the C standard library matches the interpretation used by the Windows API.  If you want to force one of the interprations, declare either `AKS_REQUIRE_WIN_UNICODE` or `AKS_REQUIRE_WIN_ANSI` before the header is imported:
-
-    #define AKS_REQUIRE_WIN_UNICODE
-    #include "aksmacro.h"
-    
-    /* POSIX or Windows in Unicode mode */
-    
-    ...
-    
-    #define AKS_REQUIRE_WIN_ANSI
-    #include "aksmacro.h"
-    
-    /* POSIX or Windows in ANSI mode */
-
-These requirement macros will only check the mode on the Win32 platform.  They are ignored and have no effect when building on POSIX.  If you only want to allow, for example, Windows Unicode builds and nothing else, use both `AKS_REQUIRE_WIN` and `AKS_REQUIRE_WIN_UNICODE` at the same time:
-
-    #define AKS_REQUIRE_WIN
-    #define AKS_REQUIRE_WIN_UNICODE
-    #include "aksmacro.h"
-    
-    /* Windows in Unicode mode only */
 
 ## Binary and text modes
 
