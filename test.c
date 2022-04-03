@@ -4,11 +4,7 @@
  * 
  * Test program for aksmacro.h
  * 
- * This includes the header with AKS_REQUIRE_BINMODE defined if not
- * already defined.  Then, it includes the header again to make sure the
- * header works when used multiple times.  You can define other options
- * when compiling this test program to test out the other options of the
- * header.
+ * You can define AKS_FILE64 to try out the 64-bit file functions.
  * 
  * The program begins by setting binary mode on standard input and text
  * mode on standard output using the portable macro functions.  Then, it
@@ -21,22 +17,19 @@
  * functions to do this.
  */
 
-/* Define AKS_REQUIRE_BINMODE if not already defined */
-#ifndef AKS_REQUIRE_BINMODE
-#define AKS_REQUIRE_BINMODE
-#endif
-
 /* Include the header */
+#define AKS_BINMODE
+#define AKS_TRANSLATE_MAIN
 #include "aksmacro.h"
 
-/* Include the header again */
+/* Include the header again just to check it works */
 #include "aksmacro.h"
 
 /* Other includes */
 #include <stdio.h>
 
-/* Program entrypoint */
-int main(int argc, char *argv[]) {
+/* (Translated) program entrypoint */
+static int maint(int argc, char *argv[]) {
 
   FILE *fh = NULL;
 #ifdef AKS_FILE64
@@ -72,7 +65,7 @@ int main(int argc, char *argv[]) {
 #ifdef AKS_FILE64
   printf("64-bit file seek/tell selected.\n");
   printf("Querying length of %s\n", argv[1]);
-  fh = fopen(argv[1], "rb");
+  fh = fopent(argv[1], "rb");
   if (fh != NULL) {
     if (!fseekw(fh, 0, SEEK_END)) {
       fs = ftellw(fh);
@@ -99,7 +92,7 @@ int main(int argc, char *argv[]) {
 #else
   printf("32-bit file seek/tell selected.\n");
   printf("Querying length of %s\n", argv[1]);
-  fh = fopen(argv[1], "rb");
+  fh = fopent(argv[1], "rb");
   if (fh != NULL) {
     if (!fseek(fh, 0, SEEK_END)) {
       fs = ftell(fh);
