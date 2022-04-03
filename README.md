@@ -1,20 +1,18 @@
 # aksmacro
 
-Macro routines for Arctic Kernel Services.  This project contains a single C header file `aksmacro.h` that can be used for specific purposes described below in this README.  There is no implementation file to compile; to use `aksmacro` just include the `aksmacro.h` header in your project.  You may include the header however many times you want.
-
-Using `aksmacro.h` you can write C programs that are portable between POSIX and Windows with minimal overhead, provided that you follow the guidelines and limitations outlined in this README.  If you need further portability beyond what `aksmacro.h` offers, you can either add your own extensions (made easier by the platform determination macros of `aksmacro.h`) or switch to a more sophisticated solution, such as Cygwin.
+Macro routines for Arctic Kernel Services.  This project contains a single C header file `aksmacro.h` that can be used to help make C programs portable between POSIX and Windows with minimal overhead.  There is no implementation file to compile; to use `aksmacro` just include the `aksmacro.h` header in your project.  You may include the header however many times you want.  The specific uses of the header are described in this README.
 
 ## Platform determination
 
-The two main platform targets in use these days are WinAPI and POSIX.  WinAPI is used by Microsoft Windows, and has been traditionally supported by all 32-bit and 64-bit Microsoft Windows operating systems from Windows 95 and Windows NT up to the present (Windows 11 at time of writing).  The ancient 16-bit Windows 3.x and earlier platforms that ran on top of DOS are _not_ supported by WinAPI.  Also, sometimes Microsoft uses the Windows name for mobile or embedded platforms that do not include full WinAPI support, such as Windows RT and Universal Windows Platform (UWP).
+The two main platform targets in use these days are Windows and POSIX.  "Windows" in this README refers to 32-bit and 64-bit versions of Microsoft Windows that support the WinAPI (sometimes also called Win32 or Win64).  This includes all mainstream releases of Microsoft Windows from Windows 95 and Windows NT up to the present (Windows 11 at time of writing).  The ancient 16-bit Windows 3.x and earlier platforms that ran on top of DOS are _not_ covered by this definition of "Windows".  Nor are certain mobile and embedded platforms such as Windows RT that do not fully support WinAPI.
 
-POSIX is used on most other platforms that are not Windows.  UNIX and UNIX-like operating systems, Linux, BSD, and Solaris are all POSIX platforms.  MacOS operating systems since OS X are also POSIX, though the historic "classic Mac OS" (last updated in 2001) is not POSIX.  Although mobile platforms such as Android and iOS might be built on top of POSIX kernels, the mobile interface tends not to work well for C-style console applications, so generally mobile applications for Android and iOS will _not_ be written directly against the POSIX kernel.  Also, DOS is not POSIX.
+POSIX covers most other platforms that are not Windows.  UNIX and UNIX-like operating systems, Linux, BSD, and Solaris are all POSIX platforms.  MacOS operating systems since OS X are also POSIX, though the historic "classic Mac OS" (last updated in 2001) is not POSIX.  Although mobile platforms such as Android and iOS might be built on top of POSIX kernels, the mobile interface tends not to work well for C-style console applications, so generally mobile applications for Android and iOS will _not_ be POSIX.  Also, DOS is not POSIX.
 
-The `aksmacro.h` header is only designed to work on WinAPI and POSIX platforms.  Its behavior is undefined if you include it when compiling for other platforms.
+The `aksmacro.h` header is only designed to work on Windows and POSIX platforms.  Its behavior is undefined if you include it when compiling for other platforms.
 
-The first thing the header does is to determine whether it is on WinAPI or POSIX.
+The first thing the header does is to determine whether it is on Windows or POSIX.
 
-To do this, it checks for the presence of any of the following WinAPI macro definitions:
+To do this, it checks for the presence of any of the following Windows platform macro definitions:
 
 - `_WIN32`
 - `_WIN64`
@@ -22,9 +20,9 @@ To do this, it checks for the presence of any of the following WinAPI macro defi
 - `__TOS_WIN__`
 - `__WINDOWS__`
 
-If any of these five macros are defined, the platform is WinAPI.  If none of them are defined, the platform is assumed to be POSIX.  The five macro definitions shown above are from the "Pre-defined Compiler Macros" project at https://sourceforge.net/projects/predef/
+If any of these five macros are defined, the platform is Windows.  If none of them are defined, the platform is assumed to be POSIX.  The five macro definitions shown above are from the "Pre-defined Compiler Macros" project at https://sourceforge.net/projects/predef/
 
-If AKS determines the platform is WinAPI, it will define the macro `AKS_WIN` if not already defined.  If AKS determines the platform is POSIX, it will define the macro `AKS_POSIX` if not already defined.  Finally, it will make sure that `AKS_WIN` and `AKS_POSIX` are not both defined at the same time.  Example:
+If `aksmacro.h` determines the platform is Windows, it will define the macro `AKS_WIN`.  If `aksmacro.h` determines the platform is POSIX, it will define the macro `AKS_POSIX`.  However, if either `AKS_WIN` or `AKS_POSIX` is already defined when `aksmacro.h` is included, the header will skip the platform detection and assume the defined platform is correct.  The header will fail with an error if both `AKS_WIN` and `AKS_POSIX` are defined at the same time.  Example use of platform detection:
 
     #include "aksmacro.h"
     
@@ -36,27 +34,127 @@ If AKS determines the platform is WinAPI, it will define the macro `AKS_WIN` if 
     /* POSIX-specific code */
     #endif
 
-If your code only supports WinAPI or only supports POSIX, you can define `AKS_REQUIRE_WIN` or `AKS_REQUIRE_POSIX` before including the header.  The header will then check that the platform matches the stated requirement or cause a compilation error otherwise:
+## Windows ANSI and Unicode
 
-    #define AKS_REQUIRE_WIN
+The Windows API has separate sets of ANSI and Unicode functions, where the ANSI functions have a suffix `A` and the Unicode functions have a suffix `W`.  This similarly applies to the standard C library on Windows, where there are the regular ANSI functions and then a set of Windows-specific Unicode functions.  The standard C library on Windows also has separate modes for handling legacy multibyte encodings such as Shift-JIS.
+
+This presents a problem for software that wants to be portable between POSIX and Windows, since these different text handling modes are specific to Windows.  There are two different approaches supported by `aksmacro.h`, each of which is covered in a subsection below.
+
+### ANSI-only operation
+
+The simplest option for portable programs is to only support ANSI mode on Windows.  You can do this by defining the `AKS_REQUIRE_WIN_ANSI` macro before including the `aksmacro.h` header:
+
+    #define AKS_REQUIRE_WIN_ANSI
+    #include "aksmacro.h"
+
+When this macro is defined and the current platform is Windows, the header will make sure that neither `UNICODE` nor `_UNICODE` nor `_MBCS` are defined, causing a compilation error otherwise.  If the current platform is POSIX, `AKS_REQUIRE_WIN_ANSI` has no effect.
+
+When you require Windows programs to compile in ANSI mode, you don't have to worry about all the Unicode-specific functions.  You can still use Unicode, provided that you use binary mode for I/O, as explained later in this README.
+
+The only limitations to the ANSI-only approach on Windows is that you may not be able to access file paths that include Unicode characters, and you may not be able to access environment variables that have Unicode in either the variable name or the variable value.
+
+### Translated operation
+
+To support both ANSI and Unicode mode on Windows in a portable way, you should use translated macro wrappers defined by `aksmacro.h` for certain ANSI C functions, and you should also use the translated `main` function.  This section describes how to do both of these things.
+
+The following chart shows all the ANSI C (C89/C90) functions that are affected by translation, and the names of their translation macros:
+
+    <stdio.h>
+    remove  -> removet
+    rename  -> renamet
+    tmpnam  -> tmpnamt
+    fopen   -> fopent
+    freopen -> freopent
+    
+    <stdlib.h>
+    getenv  -> getenvt
+    system  -> systemt
+
+The translation macros have the same interface as the underlying ANSI C functions, with one exception:  since these are macros, their arguments must not have any side effects, such as occurs with `++` increment operator.  Note that `tmpnamt` nor `getenvt` are not thread-safe (just like their underlying ANSI functions).
+
+In order to use these translation macros, you must define `AKS_TRANSLATE` before including the header:
+
+    #define AKS_TRANSLATE
     #include "aksmacro.h"
     
     ...
     
-    #define AKS_REQUIRE_POSIX
-    #include "aksmacro.h"
+    FILE *fh = NULL;
+    fh = fopent("example.txt", "rb");
+    ...
 
-The platform check is done at the time the header is included.  It is an error if both `AKS_REQUIRE_WIN` and `AKS_REQUIRE_POSIX` are defined at the same time when the header is included.
+Using `AKS_TRANSLATE` will cause `aksmacro.h` to `#include` the `stdio.h` and `stdlib.h` headers, as well as possibly `windows.h` on Windows.
+
+Besides using the translation macros in place of the corresponding ANSI C functions, the other thing you should do in translated mode is use the translated `main` function.  To do this, rename your `main` function to `maint`, add a `static` modifier, make sure you are using the two-argument form of `main` that returns an integer, and define `AKS_TRANSLATE_MAIN` before including `aksmacro.h` header &mdash; but only in the module that includes the translated `maint` function.  Example:
+
+    #define AKS_TRANSLATE_MAIN
+    #include "aksmacro.h"
+    
+    ...
+    
+    static int maint(int argc, char *argv[]) {
+      ...
+    }
+
+The `AKS_TRANSLATE_MAIN` option will automatically also define `AKS_TRANSLATE` if it is not already present.
+
+### Explanation of translated operation
+
+When using the translation macro wrappers and the translated `maint` function, in most cases these are just trivial wrappers.  On POSIX and on Windows in ANSI mode, each macro wrapper just calls directly through to the underlying ANSI C function, and when `AKS_TRANSLATE_MAIN` is used, a `main` function will be automatically defined that just calls through to `maint`.
+
+The difference arises when `UNICODE` and `_UNICODE` are both defined during compilation on the Windows platform.  First off, if `AKS_TRANSLATE_MAIN` or `AKS_TRANSLATE` is defined when the `aksmacro.h` header is included on Windows, a check will be made that `_MBCS` is not defined, and that either both `UNICODE` and `_UNICODE` are defined, or neither `UNICODE` nor `_UNICODE` are defined.  (If neither are defined, we are in ANSI mode, and the trivial wrappers described above are used instead.)
+
+In Unicode mode, the translation functions will make copies of string parameters that have the string arguments translated from UTF-8 to UTF-16 using the Windows function `MultiByteToWideChar`.  Translation functions that return a string will translate the returned string from UTF-16 back to UTF-8 using the Windows function `WideCharToMultiByte` and then store a pointer to that buffer in a statically allocated pointer location defined by `aksmacro.h`, with any previous buffer stored there freed before writing the new one.
+
+Also in Unicode mode, when `AKS_TRANSLATE_MAIN` is used, the `aksmacro.h` header will define a Windows-specific `wmain` function that accepts parameters in UTF-16.  This `wmain` function will then translate its arguments from UTF-16 to UTF-8 using the Windows function `WideCharToMultiByte` and then invoke the `maint` function using the translated UTF-8 parameters.
+
+In short, translated operation on Windows in Unicode mode will automatically translate between UTF-8 used in client code and UTF-16 expected by the Windows API and Windows standard C library when operating with Unicode support.
+
+### Translation utilities
+
+When `AKS_TRANSLATE` or `AKS_TRANSLATE_MAIN` is defined, the `aksmacro.h` header defines two macro functions that are used for implementing the translation macros.  These macro functions may also be useful to clients that are implementing their own macro layers above other Windows functionality, so they are defined in this section.
+
+First, a data type called `aks_tchar` is `typedef` declared to be the equivalent of a `char` on POSIX and Windows in ANSI mode, or the equivalent of a `wchar_t` on Windows in Unicode mode.
+
+Second, the following two functions are defined:
+
+    aks_tchar *aks_toapi(const char *pStr)
+    --------------------------------------
+    
+    Parameters:
+    
+      pStr - pointer to an (8-bit) string to convert
+    
+    Return:
+    
+      newly allocated generic string copy
+    
+    ===
+    
+    char *aks_fromapi(const aks_tchar *pStr)
+    ----------------------------------------
+    
+    Parameters:
+    
+      pStr - pointer to a generic string to convert
+    
+    Return:
+    
+      newly allocated 8-bit string copy
+
+These are actual `static` functions that are declared by the `aksmacro.h` header.  Both create a new dynamically allocated copy of their given argument, translating between generic `aks_tchar` strings and 8-bit `char` strings.  However, if NULL is passed to either of these functions, NULL is returned.  If a non-NULL pointer is returned, it should eventually be released with `free()`.
+
+On POSIX and on Windows in ANSI mode, these functions just make a dynamic string copy and return it.  On Windows in Unicode mode, these functions convert between UTF-16 used by the `aks_tchar` string and UTF-8 used by the `char` string.
 
 ## ANSI C support
 
-If you are writing C programs that seek to be portable between POSIX and WinAPI, you should stay as close as possible to ANSI C (C89/C90).  Microsoft has traditionally been very slow at updating C language support in their compilers.  Furthermore, there are certain sections of the ANSI C standard that are problematic and should be avoided in modern applications, even if they are part of the ANSI C standard.
+If you are writing C programs that seek to be portable between POSIX and Windows, you should stay as close as possible to ANSI C (C89/C90).  Microsoft has traditionally been very slow at updating C language support in their compilers.  Furthermore, there are certain sections of the ANSI C standard that are problematic and should be avoided in modern applications, even if they are part of the ANSI C standard.
 
 The following subsections have specifics about what parts of ANSI C to avoid.
 
 ### Unsafe string reading
 
-The ANSI C function `gets()` is highly vulnerable to buffer overruns.  POSIX standards discourage use of this function for that reason.  Microsoft has dropped the function entirely due to security concerns.
+The ANSI C function `gets()` is highly vulnerable to buffer overruns.  POSIX standards discourage use of this function for that reason.  Windows has dropped the function entirely due to security concerns.
 
 In short, do not use `gets()`!
 
@@ -64,7 +162,7 @@ In short, do not use `gets()`!
 
 ANSI C was defined before Unicode existed.  As such, it has its own system of "locales" for handling different character sets and international characters.  ANSI C also has a system of "wide characters" that can convert between multibyte encodings such as Shift-JIS and extended character codes.
 
-For modern applications, you should either limit the application to US-ASCII, or use Unicode.  Do not use the legacy locale functions, and do not use the wide characters.
+For modern applications, you should either limit the application to US-ASCII or use Unicode.  Do not use the legacy locale functions, and do not use the wide characters.
 
 The following functionality should therefore be avoided (sorted by relevant header):
 
@@ -102,95 +200,90 @@ On modern platforms, you should be able to assume with great confidence that the
 
 Unicode support is much more involved, but it will work the same way on both Windows and POSIX.  There are portable libraries available that can help with various aspects of Unicode implementation.
 
-### Platform quirks
+### Signals
 
-When using compilers such as GCC, you may need to include a math library with `-lm` if you use math functions from `<math.h>`.  On Windows, the math functions are included within the standard C library, so you should not need to include any extra libraries.
+Signals are prone to platform-specific quirks, and the way in which signals are used in POSIX versus Windows is quite different.  Portable software is therefore well advised to avoid `<signal.h>`.
 
-WinAPI doesn't have the concept of signals, so it's a good idea to avoid the use of `<signal.h>` when writing portable code.
+### Binary and text modes
 
-### WinAPI ANSI and Unicode modes
+ANSI C has the concept of `FILE *` handles being either in _text_ or _binary_ mode.  On POSIX, there is no difference between these two modes.  On Windows, on the other hand, the modes _are_ different, and Windows even adds additional Windows-specific modes.
 
-For historical reasons, WinAPI has a convoluted system of different text handling modes.  On the fundamental WinAPI level, most key functions that accept string parameters have two different versions, an `A` version that accepts 8-bit strings and a `W` version that accepts 16-bit wide-character strings.  In the C standard library implementation, there are a number of Windows-specific wide-character variants of various functions and also special multibyte variants for handling legacy non-Unicode multibyte encodings.  On top of this, there is a "generic" system for both the WinAPI and the C standard library that allows the same code to work with both 8-bit strings and 16-bit wide-character strings based on what macros are provided during compilation.
+The following rules should be observed for portable software:
 
-None of these convoluted modes or variant functions exist on POSIX.  Modern POSIX can just use 8-bit UTF-8 with the standard functions.  Things would be easy if WinAPI would allow you to use UTF-8 with its 8-bit functions, but unfortunately you must use the 16-bit wide-character functions to get full Unicode support on WinAPI.
+> __Rule 1:__  Only use US-ASCII in text mode.  If you are working with Unicode text, binary files, or something else, always use binary mode, even if the data you are working with is text.
 
-`aksmacro.h` attempts to provide a practical approach to portability in the following manner.  
+This rule is because on Windows, text mode has all sorts of strange, Windows-specific behaviors and policies for anything except US-ASCII.
 
-First of all, the official WinAPI docs consider the multibyte character extensions to be historic, so `aksmacro.h` will check for the `_MBCS` macro definition and fail if it is present, thereby preventing the multibyte mode.  One less thing to worry about.
+> __Rule 2:__ Always use LF line breaks when in text mode.  In binary mode, line breaks should be LF on POSIX and CR+LF on Windows.
 
-Second, `aksmacro.h` will check that either both `UNICODE` and `_UNICODE` are defined, or that neither are defined.  The `UNICODE` macro switches WinAPI from `A` functions to `W` functions, while the `_UNICODE` macro switches the C standard library generics to wide characters.  It's a good idea to have consistent generics in both WinAPI and the C standard library, which is why you must either use wide characters in both or wide characters in neither.
+Windows will automatically translate between LF and CR+LF line breaks when reading and writing, but only in text mode.  In binary mode, you must do these translations yourself.
 
-Third, `aksmacro.h` will typedef a generic character type, `aks_tchar`.  On POSIX, this type is always equivalent to `char`.  On Windows, this type is equivalent to `_TCHAR` which is either 8-bit or 16-bit depending on whether or not `_UNICODE` is defined.  (On Windows, the `<tchar.h>` header will always be imported by `aksmacro.h`)
+> __Rule 3:__ Windows usually wants a Byte Order Mark (BOM) at the start of UTF-8 files.  But don't use BOMs on POSIX.
 
-Fourth, `aksmacro.h` will define two macro functions, `aks_toapi()` and `aks_fromapi()` that can perform string conversions.  The function descriptions are given below:
+Until very recently, the built-in text editor Notepad on Windows would only read text files as UTF-8 if they had a BOM at the start.  However, a BOM can cause problems with other kinds of software that is not expecting it, so even on Windows it shouldn't _always_ be used.  You should almost always avoid UTF-8 BOMs on POSIX.
 
-    aks_tchar *aks_toapi(const char *pStr)
-    --------------------------------------
+> __Rule 4:__ Explicitly set text or binary mode on standard I/O streams at the start of the program.
+
+There is no way in ANSI C to explicity set text or binary mode on a standard I/O stream, but see later in this README for extension macros added by `aksmacro.h` that allow a portable way of doing this.  Since the difference between text and binary mode is significant on Windows, you should always make sure the standard I/O streams have been set into the correct mode.
+
+> __Rule 5:__ Don't expect Unicode to work in console windows.
+
+Unicode support has always been iffy in console windows, and _especially_ on Windows.  However, when standard input and output is redirected to files or pipes, Unicode will work without problem.
+
+### Math library
+
+Even though `<math.h>` is a part of the C standard library, compilers for POSIX such as GCC tend to treat it as though it were a third-party library.  On POSIX therefore you may need to use `-lm` or a similar option while compiling and linking to make sure the math library is linked in if you use `<math.h>`.  This issue doesn't exist on Windows, where the math library is part of the C runtime.
+
+## Portable C extensions
+
+There are a few modern features missing from ANSI C (C89/C90) that however are widely supported on modern systems and can be used portably.  The subsections below describe the widely-supported extensions and how `aksmacro.h` helps to access these in a portable manner.
+
+### Setting standard I/O stream modes
+
+As explained in an earlier section, the difference between text mode and binary mode is important when software is running on Windows.  Unfortunately, ANSI C does not provide a way to explicity set the mode on `FILE *` handles that are already open at the start of the program &mdash; in particular, standard input and standard output.
+
+If you define the macro `AKS_BINMODE` before including `aksmacro.h`, the header will define the following two functions:
+
+    int aks_binmode(FILE *fh)
+    -------------------------
     
     Parameters:
     
-      pStr - pointer to an (8-bit) string to convert
+      fh - the file handle to modify
     
     Return:
     
-      newly allocated generic string copy
+      -1 if error, something else otherwise
     
     ===
     
-    char *aks_fromapi(const aks_tchar *pStr)
-    ----------------------------------------
+    int aks_textmode(FILE *fh)
+    --------------------------
     
     Parameters:
     
-      pStr - pointer to a generic string to convert
+      fh - the file handle to modify
     
     Return:
     
-      newly allocated 8-bit string copy
+      -1 if error, something else otherwise
 
-On POSIX and in Windows in ANSI mode, both of these functions simply dynamically allocate a new buffer, copy the string as-is into the buffer, and return the new string copy.  In Windows in Unicode mode, the WinAPI functions `MultiByteToWideChar` and `WideCharToMultiByte` are used to convert between UTF-8 in 8-bit strings and UTF-16 in wide-character strings.
+The `AKS_BINMODE` declaration will also cause `aksmacro.h` to `#include` the `stdio.h` header, and on Windows also the `io.h` and `fcntl.h` headers.  On POSIX, these functions simply return 1 and do nothing else because there is no difference between text and binary modes on POSIX.  On Windows, the `_setmode()` and `_fileno()` extension functions will be used to explicitly set the mode on the streams.  Example:
 
-The returned string copy should eventually be freed with `free()`.  If NULL is passed to either of these macro functions, NULL will be returned.
-
-__Caution:__ Since these are macro functions, the argument must not have any side effects.
-
-Fifth, for all of the following standard C functions, `aksmacro.h` will define a macro wrapper with names shown below:
-
-    <stdio.h>
-    remove  -> removet
-    rename  -> renamet
-    tmpnam  -> ttmpnam (*)
-    fopen   -> fopent
-    freopen -> freopent
-    
-    <stdlib.h>
-    getenv  -> tgetenv (*)
-    system  -> systemt
-
-All macro wrappers except those marked with `(*)` have the exact same interface as their corresponding library functions, except that their arguments must not have any side effects due to their macro nature.  The macro wrappers marked with `(*)` have a slightly different interface than the standard functions.  Instead of returning a pointer to a value in a static buffer that shouldn't be freed, they return a dynamically allocated string copy that _should_ eventually be freed with `free()`.
-
-On POSIX and on Windows in ANSI mode, the macro wrappers just call directly through to the corresponding standard library functions.  However, the functions marked with `(*)` will afterwards make a dynamically allocated copy of the return value and then return a pointer to this copy, unless the return value is NULL in which case NULL is returned.
-
-On Windows in Unicode mode, the macro wrappers will first convert any string arguments to UTF-16 using the `aks_toapi()` macro defined earlier.  The Windows-specific wide-character version of the library function will then be invoked using the UTF-16 parameter copies.  Once the function returns, the UTF-16 copies will be released.  For the functions marked with `(*)`, their return argument will be converted back to UTF-8 using `aks_fromapi()` and then this conversion will be returned.
-
-Sixth, `aksmacro.h` will define a `main()` function if you declare `AKS_MAIN` before importing the header.  The header will undefine `AKS_MAIN` when finished so that this definition only applies once.  Prior to doing this, you should define your actual `main()` function with the same interface as usual, except call it `maint()` instead.  The `main()` function defined by `aksmacro.h` will call into this main function:
-
+    #define AKS_BINMODE
     #include "aksmacro.h"
     
-    ...
-    
-    int maint(int argc, char *argv[]) {
-      /* Your main function here */
+    if (aks_binmode(stdin) == -1) {
+      fprintf(stderr, "Failed to set standard input to binary!\n");
     }
     
-    #define AKS_MAIN
-    #include "aksmacro.h"
+    if (aks_textmode(stdout) == -1) {
+      fprintf(stderr, "Failed to set standard output to text!\n");
+    }
 
-On POSIX and on Windows in ANSI mode, the macro-defined `main()` function will just call through to the `maint()` function.  On Windows in Unicode mode, the macro-defined `main()` function will use the Windows-specific `wmain()` function to receive its arguments in UTF-16.  Then, it will rebuild the argument array with UTF-8 versions of all arguments.  Finally, it will call the `maint()` function using the UTF-8 conversions.
+You should only change the mode at the beginning before reading or writing any data with the handle.
 
-The recommended strategy is therefore to always use the wrapper macros for the relevant standard library functions shown above, bearing in mind the different interface for the functions marked `(*)`, and also to use the macro wrapper for `main()` as demonstrated above.  When compiling on POSIX and on Windows in ANSI mode, this adds a negligible amount of overhead.  When compiling on Windows in Unicode mode, this almost transparently allows you to use UTF-8.
-
-## 64-bit file support
+### 64-bit file support
 
 The C standard library functions `fseek()` and `ftell()` assume that offsets within files can be stored within the `long` data type.  The `long` data type is only guaranteed to be 32-bit, however, so the `fseek()` and `ftell()` functions are not reliable when working with files that approach or exceed 2GB in size.
 
@@ -213,28 +306,3 @@ To get portable 64-bit file support with `aksmacro.h`, define the macro `AKS_FIL
 Note that `fseekw()` `ftellw()` and `aks_off64` are only defined if you define `AKS_FILE64` before including the header.  However, if either the `fseekw` or `ftellw` macros are already defined before the header is included, the header will assume everything is already set up and define none of these three entities even if `AKS_FILE64` is defined.
 
 Specifying `AKS_FILE64` will automatically `#include <stdio.h>`
-
-## Binary and text modes
-
-The standard C I/O library `<stdio.h>` has the concept of text mode versus binary mode for file handles.  On POSIX, there is no difference between these two modes.  However, on Windows, text mode may attempt to translate between UNIX-style LF line breaks and DOS-style CR+LF line breaks.  If you are working with binary files, it is important on Windows (but not on POSIX) to make sure the file mode is binary rather than text, so that bytes that happen to have the LF character code don't get replaced by CR+LF sequences.
-
-Since these two modes are part of the C standard, you can generally just use the portable `fopen()` function to specify the correct mode when opening a file.
-
-The one catch is handling the standard I/O streams, which are already open when the program starts.  In Windows, these are probably opened in text mode, so if you are reading a binary file from standard input or writing a binary file to standard output, you will have to change the file mode from text to binary, but there is no obvious way to do this with the C standard library.
-
-The standard C library on Windows provides extension functions that are able to change the file mode of an open file.  Specifically, `_fileno()` is used to get the file descriptor number of a `FILE *` handle such as `stdin` or `stdout` and then `_setmode()` is used to change the mode of that handle.
-
-The `aksmacro.h` header can include portable macro wrappers for this functionality if you specify the `AKS_REQUIRE_BINMODE` macro before including the `aksmacro.h` header.  This will define two macros `aks_binmode()` and `aks_textmode()` if they are not already defined.  Both take a single parameter that is the `FILE *` handle to modify, and both return -1 if setting the mode failed or some other value if setting the mode succeeded.  On POSIX, both of these macros always just return the value 1 because there is no difference between binary mode and text mode on POSIX.  On Windows, the `_setmode()` function will be invoked with the `_fileno()` of the handle and the appropriate mode constant.  The Windows implementation will also pull in the correct headers.  Example:
-
-    #define AKS_REQUIRE_BINMODE
-    #include "aksmacro.h"
-    
-    if (aks_binmode(stdin) == -1) {
-      fprintf(stderr, "Failed to set standard input to binary!\n");
-    }
-    
-    if (aks_textmode(stdout) == -1) {
-      fprintf(stderr, "Failed to set standard output to text!\n");
-    }
-
-You should only change the mode at the beginning before reading or writing any data from the handle.
