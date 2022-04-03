@@ -306,3 +306,19 @@ To get portable 64-bit file support with `aksmacro.h`, define the macro `AKS_FIL
 Note that `fseekw()` `ftellw()` and `aks_off64` are only defined if you define `AKS_FILE64` before including the header.  However, if either the `fseekw` or `ftellw` macros are already defined before the header is included, the header will assume everything is already set up and define none of these three entities even if `AKS_FILE64` is defined.
 
 Specifying `AKS_FILE64` will automatically `#include <stdio.h>`
+
+### Floating-point extensions
+
+ANSI C (C89/C90) lacks support for IEEE floating-point.  However, modern C compilers will use IEEE floating-point for the `float` and `double` types.
+
+Within the `<math.h>` header, you can use the `isfinite()` macro reliably from later C standards to determine whether a given floating-point value is finite, or whether it is one of the non-finite values (positive infinity, negative infinity, or NaN).  This is supported in the POSIX standards and has been supported in Visual C++ since Visual Studio 2013.
+
+If you are compiling for older Visual C++ compilers, the older versions used a function `_finite()` within the `<math.h>` header to check whether `double` values are finite, and a function `_finitef()` within the `<math.h>` header to check whether `float` values are finite.
+
+### Standard integers
+
+ANSI C (C89/C90) does not have any fixed-size integer declarations.  This makes it difficult to implement various software that has specific integer size requirements.
+
+Later C standards added the `<stdint.h>` header that defines a number of type declarations and macros that make it much easier to work with fixed-size integers.  This header is supported by the POSIX standards and has been supported in Visual C++ since Visual Studio 2010.
+
+If you are compiling for older compilers that lack this header, consider using the portable `stdint` header at: http://www.azillionmonkeys.com/qed/pstdint.h
