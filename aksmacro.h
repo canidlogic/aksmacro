@@ -114,6 +114,25 @@
  *                   *
  * * * * * * * * * * */
 
+/* If AKS_TRANSLATE_MAIN or AKS_TRANSLATE is specified, and we are on
+ * Windows with Unicode CRT mode, then specify AKS_SETERR if not already
+ * specified */
+#ifdef AKS_TRANSLATE_MAIN
+#ifdef AKS_WIN_WCRT
+#ifndef AKS_SETERR
+#define AKS_SETERR
+#endif
+#endif
+#endif
+
+#ifdef AKS_TRANSLATE
+#ifdef AKS_WIN_WCRT
+#ifndef AKS_SETERR
+#define AKS_SETERR
+#endif
+#endif
+#endif
+
 /* Define aks_seterr() macro if requested and not already defined */
 #ifdef AKS_SETERR
 #ifndef AKS_SETERR_INCLUDED
@@ -303,7 +322,8 @@ typedef wchar_t aks_tchar;
  * Convert an 8-bit string to a generic string.
  * 
  * On Windows in Unicode mode, this converts UTF-8 on input into UTF-16
- * in the string copy.  If NULL is passed, NULL is returned.
+ * in the string copy.  If NULL is passed, NULL is returned.  If there
+ * is a translation error, NULL is returned.
  * 
  * Parameters:
  * 
@@ -311,7 +331,8 @@ typedef wchar_t aks_tchar;
  * 
  * Return:
  * 
- *   the dynamically allocated generic UTF-16 string copy
+ *   the dynamically allocated generic UTF-16 string copy, or NULL if
+ *   error
  */
 static aks_tchar *aks_toapi(const char *pStr) {
   
@@ -332,7 +353,7 @@ static aks_tchar *aks_toapi(const char *pStr) {
           0);
     if (sz < 1) {
       /* Conversion failed */
-      abort();
+      return NULL;
     }
     
     /* Allocate buffer for copy */
@@ -349,7 +370,7 @@ static aks_tchar *aks_toapi(const char *pStr) {
           -1,
           pResult,
           sz) != sz) {
-      /* Conversion failed */
+      /* Shouldn't happen because we already did conversion earlier */
       abort();
     }
   }
@@ -362,7 +383,8 @@ static aks_tchar *aks_toapi(const char *pStr) {
  * Convert a generic string to an 8-bit string.
  * 
  * On Windows in Unicode mode, this converts UTF-16 on input into UTF-8
- * in the string copy.  If NULL is passed, NULL is returned.
+ * in the string copy.  If NULL is passed, NULL is returned.  If there
+ * is a translation error, NULL is returned.
  * 
  * Parameters:
  * 
@@ -370,7 +392,7 @@ static aks_tchar *aks_toapi(const char *pStr) {
  * 
  * Return:
  * 
- *   the dynamically allocated UTF-8 string copy
+ *   the dynamically allocated UTF-8 string copy, or NULL if error
  */
 static char *aks_fromapi(const aks_tchar *pStr) {
   
@@ -393,7 +415,7 @@ static char *aks_fromapi(const aks_tchar *pStr) {
           NULL);
     if (sz < 1) {
       /* Conversion failed */
-      abort();
+      return NULL;
     }
     
     /* Allocate buffer for copy */
@@ -412,7 +434,7 @@ static char *aks_fromapi(const aks_tchar *pStr) {
           sz,
           NULL,
           NULL) != sz) {
-      /* Conversion failed */
+      /* Shouldn't happen because we already did conversion earlier */
       abort();
     }
   }
@@ -423,18 +445,21 @@ static char *aks_fromapi(const aks_tchar *pStr) {
 
 /*
  * On Windows in Unicode mode, the translation functions must handle
- * parameter conversions and call the wide-character versions.
+ * parameter conversions, calling the wide-character versions, and
+ * simulating errors if there is a translation problem.
  */
 static int removet(const char *f) {
   aks_tchar *tf = NULL;
   int result = 0;
   
   tf = aks_toapi(f);
-  result = _wremove(tf);
-  
-  if (tf != NULL) {
-    free(tf);
+  if (tf == NULL) {
+    aks_seterr(EINVAL);
+    return -1;
   }
+  
+  result = _wremove(tf);
+  free(tf);
   
   return result;
 }
@@ -446,14 +471,22 @@ static int renamet(const char *t, const char *v) {
   
   tt = aks_toapi(t);
   tv = aks_toapi(v);
-  result = _wrename(tt, tv);
   
-  if (tt != NULL) {
-    free(tt);
+  if ((tt == NULL) || (tv == NULL)) {
+    if (tt != NULL) {
+      free(tt);
+    }
+    if (tv != NULL) {
+      free(tv);
+    }
+    
+    aks_seterr(EINVAL);
+    return -1;
   }
-  if (tv != NULL) {
-    free(tv);
-  }
+  
+  result = _wrename(tt, tv);
+  free(tt);
+  free(tv);
   
   return result;
 }
@@ -548,14 +581,22 @@ static FILE *fopent(const char *f, const char *m) {
   
   tf = aks_toapi(f);
   tm = aks_toapi(m);
-  result = _wfopen(tf, tm);
   
-  if (tf != NULL) {
-    free(tf);
+  if ((tf == NULL) || (tm == NULL)) {
+    if (tf != NULL) {
+      free(tf);
+    }
+    if (tm != NULL) {
+      free(tm);
+    }
+    
+    aks_seterr(EINVAL);
+    return NULL;
   }
-  if (tm != NULL) {
-    free(tm);
-  }
+  
+  result = _wfopen(tf, tm);
+  free(tf);
+  free(tm);
   
   return result;
 }
@@ -567,36 +608,59 @@ static FILE *freopent(const char *f, const char *m, FILE *s) {
   
   tf = aks_toapi(f);
   tm = aks_toapi(m);
-  result = _wfreopen(tf, tm, s);
   
-  if (tf != NULL) {
-    free(tf);
+  if ((tf == NULL) || (tm == NULL)) {
+    if (tf != NULL) {
+      free(tf);
+    }
+    if (tm != NULL) {
+      free(tm);
+    }
+    
+    /* We also need to close the given handle, per the interface
+     * definition */
+    fclose(s);
+    aks_seterr(EINVAL);
+    return NULL;
   }
-  if (tm != NULL) {
-    free(tm);
-  }
+  
+  result = _wfreopen(tf, tm, s);
+  free(tf);
+  free(tm);
   
   return result;
 }
 
 static char *getenvt(const char *n) {
+  /* This function is a bit different because it must simulate a static
+   * buffer */
+  
   aks_tchar *tn = NULL;
   aks_tchar *result = NULL;
   static char *pb = NULL;
   
+  /* Release the simulated static buffer if allocated */
   if (pb != NULL) {
     free(pb);
     pb = NULL;
   }
   
+  /* Convert parameter; just return NULL if conversion fails or if we
+   * were passed NULL to begin with */
   tn = aks_toapi(n);
-  result = _wgetenv(tn);
-  pb = aks_fromapi(result);
-  
-  if (tn != NULL) {
-    free(tn);
+  if (tn == NULL) {
+    return NULL;
   }
   
+  /* Call through with translated parameter and then free it */
+  result = _wgetenv(tn);
+  free(tn);
+  
+  /* Translate return value into simulated static buffer; if return
+   * value was NULL, the translation will also be NULL */
+  pb = aks_fromapi(result);
+  
+  /* Return the translated result or NULL */
   return pb;
 }
 
@@ -605,11 +669,13 @@ static int systemt(const char *s) {
   int result = 0;
   
   ts = aks_toapi(s);
-  result = _wsystem(ts);
-  
-  if (ts != NULL) {
-    free(ts);
+  if (ts == NULL) {
+    aks_seterr(EINVAL);
+    return -1;
   }
+  
+  result = _wsystem(ts);
+  free(ts);
   
   return result;
 }
