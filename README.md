@@ -38,6 +38,18 @@ If `aksmacro.h` determines the platform is Windows, it will define the macro `AK
 
 The Windows API has separate sets of ANSI and Unicode functions, where the ANSI functions have a suffix `A` and the Unicode functions have a suffix `W`.  This similarly applies to the standard C library on Windows, where there are the regular ANSI functions and then a set of Windows-specific Unicode functions.  The standard C library on Windows also has separate modes for handling legacy multibyte encodings such as Shift-JIS.
 
+The `aksmacro.h` header will define `AKS_WIN_WAPI` if `AKS_WIN` is defined _and_ `UNICODE` is defined.  The `aksmacro.h` header will define `AKS_WIN_WCRT` if `AKS_WIN` is defined _and_ `_UNICODE` is defined.  For example:
+
+    #include "aksmacro.h"
+    
+    #ifdef AKS_WIN_WAPI
+    /* Windows API in Unicode mode */
+    #endif
+    
+    #ifdef AKS_WIN_WCRT
+    /* Windows C standard library in Unicode mode */
+    #endif
+
 This presents a problem for software that wants to be portable between POSIX and Windows, since these different text handling modes are specific to Windows.  There are two different approaches supported by `aksmacro.h`, each of which is covered in a subsection below.
 
 ### ANSI-only operation
