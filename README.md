@@ -118,7 +118,7 @@ The difference arises when `UNICODE` and `_UNICODE` are both defined during comp
 
 In Unicode mode, the translation functions will make copies of string parameters that have the string arguments translated from UTF-8 to UTF-16 using the Windows function `MultiByteToWideChar`.  Translation functions that return a string will translate the returned string from UTF-16 back to UTF-8 using the Windows function `WideCharToMultiByte` and then store a pointer to that buffer in a statically allocated pointer location defined by `aksmacro.h`, with any previous buffer stored there freed before writing the new one.
 
-Faults (`abort()`) occur if there are any problems with translation between UTF-8 and UTF-16.  This means that if you don't want a fault but the encoding of a parameter might not be reliable, you should check the parameter before passing it through to the wrapper functions.
+If there are any problems with the translation between UTF-8 and UTF-16, the translation macro wrappers will return values indicating an error in a manner matching the standard library interface.  For functions that set `errno`, translation problems between UTF-8 and UTF-16 will set `EINVAL`
 
 Also in Unicode mode, when `AKS_TRANSLATE_MAIN` is used, the `aksmacro.h` header will define a Windows-specific `wmain` function that accepts parameters in UTF-16.  This `wmain` function will then translate its arguments from UTF-16 to UTF-8 using the Windows function `WideCharToMultiByte` and then invoke the `maint` function using the translated UTF-8 parameters.
 
@@ -141,7 +141,7 @@ Second, the following two functions are defined:
     
     Return:
     
-      newly allocated generic string copy
+      newly allocated generic string copy, or NULL
     
     ===
     
@@ -154,11 +154,11 @@ Second, the following two functions are defined:
     
     Return:
     
-      newly allocated 8-bit string copy
+      newly allocated 8-bit string copy, or NULL
 
-These are actual `static` functions that are declared by the `aksmacro.h` header.  Both create a new dynamically allocated copy of their given argument, translating between generic `aks_tchar` strings and 8-bit `char` strings.  However, if NULL is passed to either of these functions, NULL is returned.  If a non-NULL pointer is returned, it should eventually be released with `free()`.
+These are actual `static` functions that are declared by the `aksmacro.h` header.  Both create a new dynamically allocated copy of their given argument, translating between generic `aks_tchar` strings and 8-bit `char` strings.  If NULL is passed to them or there is an error in translation, NULL is returned.  If a non-NULL pointer is returned, it should eventually be released with `free()`.
 
-On POSIX and on Windows in ANSI mode, these functions just make a dynamic string copy and return it.  On Windows in Unicode mode, these functions convert between UTF-16 used by the `aks_tchar` string and UTF-8 used by the `char` string.  If conversion fails, a fault (`abort()`) occurs.
+On POSIX and on Windows in ANSI mode, these functions just make a dynamic string copy and return it.  On Windows in Unicode mode, these functions convert between UTF-16 used by the `aks_tchar` string and UTF-8 used by the `char` string.  If conversion fails, NULL is returned.
 
 ## ANSI C support
 
