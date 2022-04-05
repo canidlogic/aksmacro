@@ -82,7 +82,7 @@ The following chart shows all the ANSI C (C89/C90) functions that are affected b
     getenv  -> getenvt
     system  -> systemt
 
-The translation macros have the same interface as the underlying ANSI C functions, with one exception:  since these are macros, their arguments must not have any side effects, such as occurs with `++` increment operator.  Note that `tmpnamt` nor `getenvt` are not thread-safe (just like their underlying ANSI functions).
+The translation macros have the same interface as the underlying ANSI C functions, with one exception:  since these are macros, their arguments must not have any side effects, such as occurs with `++` increment operator.  Note that `tmpnamt` and `getenvt` are not thread-safe (just like their underlying ANSI functions).
 
 In order to use these translation macros, you must define `AKS_TRANSLATE` before including the header:
 
