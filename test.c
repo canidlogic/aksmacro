@@ -58,6 +58,12 @@ static int maint(int argc, char *argv[]) {
 #ifdef AKS_POSIX
   printf("POSIX platform detected.\n");
 #endif
+#ifdef AKS_WIN_WAPI
+  printf("Win32 wide character API detected.\n");
+#endif
+#ifdef AKS_WIN_WCRT
+  printf("Win32 wide character CRT detected.\n");
+#endif
   
   /* Check if a parameter was given */
   if (argc == 2) {
