@@ -10,7 +10,7 @@
  * mode on standard output using the portable macro functions.  Then, it
  * prints the platform determined by the macro definitions.  It also
  * tests the tmpnam wrapper.  (You may get a warning on some platforms
- * that tmpnam() is dangerous.)
+ * that tmpnam() is dangerous.)  Also, seterr.
  * 
  * Finally, if a path is given as the first and only command-line 
  * argument, the test program gets the length of the file using the
@@ -22,6 +22,7 @@
 /* Include the header */
 #define AKS_BINMODE
 #define AKS_TRANSLATE_MAIN
+#define AKS_SETERR
 #include "aksmacro.h"
 
 /* Include the header again just to check it works */
@@ -82,6 +83,14 @@ static int maint(int argc, char *argv[]) {
     printf("tmpnam test 2 result: %s\n", tfile);
   } else {
     printf("tmpnam test 2 FAILED.\n");
+  }
+  
+  /* Clear the error setting */
+  aks_seterr(EINVAL);
+  if (errno == EINVAL) {
+    printf("Error setting test completed.\n");
+  } else {
+    printf("Error setting test FAILED.\n");
   }
   
   /* Check if a parameter was given */
