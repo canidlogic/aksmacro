@@ -110,6 +110,34 @@
 
 /* * * * * * * * * * *
  *                   *
+ * seterr extension  *
+ *                   *
+ * * * * * * * * * * */
+
+/* Define aks_seterr() macro if requested and not already defined */
+#ifdef AKS_SETERR
+#ifndef AKS_SETERR_INCLUDED
+#define AKS_SETERR_INCLUDED
+
+/* Import appropriate headers */
+#include <errno.h>
+#ifdef AKS_WIN
+#include <stdlib.h>
+#endif
+
+/* Define macro */
+#ifdef AKS_POSIX
+#define aks_seterr(err) (errno = err)
+
+#else
+#define aks_seterr(err) _set_errno(err)
+#endif
+
+#endif
+#endif
+
+/* * * * * * * * * * *
+ *                   *
  * Translation check *
  *                   *
  * * * * * * * * * * */
