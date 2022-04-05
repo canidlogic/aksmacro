@@ -430,25 +430,87 @@ static int renamet(const char *t, const char *v) {
   return result;
 }
 
-static char *tmpnamt(const char *s) {
-  aks_tchar *ts = NULL;
+static char *tmpnamt(char *s) {
+  /* This function is different because the pointer is a buffer that
+   * will be filled in rather than a string argument */
+  
+  aks_tchar *tbuf = NULL;
   aks_tchar *result = NULL;
   static char *pb = NULL;
   
-  if (pb != NULL) {
-    free(pb);
-    pb = NULL;
+  /* Different implementation depending on whether a result buffer was
+   * passed */
+  if (s != NULL) {
+    /* Result buffer passed, so first we want to dynamically allocate a
+     * wide buffer to get the result from the API call */
+    tbuf = (aks_tchar *) calloc(L_tmpnam + 1, sizeof(aks_tchar));
+    if (tbuf == NULL) {
+      abort();
+    }
+    
+    /* Now call through with the buffer and check for error */
+    if (_wtmpnam(tbuf) != NULL) {
+      /* Call-through passed, so get a UTF-8 conversion */
+      result = aks_fromapi(tbuf);
+      if (result == NULL) {
+        /* Problem with UTF-8 conversion, so free the wide buffer, set
+         * an empty string result, and return NULL */
+        free(tbuf);
+        tbuf = NULL;
+        s[0] = (char) 0;
+        return NULL;
+      }
+      
+      /* We can now free the wide buffer */
+      free(tbuf);
+      tbuf = NULL;
+      
+      /* If length of UTF-8 conversion is L_tmpnam or greater then we
+       * don't have enough space in the passed buffer so free the
+       * conversion, set an empty string result, and return NULL */
+      if (strlen(result) >= L_tmpnam) {
+        free(result);
+        result = NULL;
+        s[0] = (char) 0;
+        return NULL;
+      }
+      
+      /* We checked the length so copy the UTF-8 conversion into the
+       * passed buffer and free the conversion buffer */
+      strcpy(s, result);
+      free(result);
+      result = NULL;
+      
+      /* Return the passed buffer */
+      return s;
+      
+    } else {
+      /* Call-through failed, so free the wide buffer, set an empty
+       * string result, and return NULL */
+      free(tbuf);
+      tbuf = NULL;
+      s[0] = (char) 0;
+      return NULL;
+    }
+    
+  } else {
+    /* No result buffer passed -- release static buffer simulation if
+     * allocated */
+    if (pb != NULL) {
+      free(pb);
+      pb = NULL;
+    }
+    
+    /* Call through and get result */
+    result = _wtmpnam(NULL);
+    
+    /* Get a translated copy in the static buffer simulation, or NULL if
+     * any kind of problem */
+    pb = aks_fromapi(result);
+    
+    /* Return the static buffer simulation */
+    return pb;
   }
-  
-  ts = aks_toapi(s);
-  result = _wtmpnam(ts);
-  pb = aks_fromapi(result);
-  
-  if (ts != NULL) {
-    free(ts);
-  }
-  
-  return pb;
 }
 
 static FILE *fopent(const char *f, const char *m) {
