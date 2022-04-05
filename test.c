@@ -4,13 +4,27 @@
  * 
  * Test program for aksmacro.h
  * 
- * You can define AKS_FILE64 to try out the 64-bit file functions.
+ * NOTE 1: You may get a warning on some platforms while compiling or
+ * linking that tmpnam() is dangerous and should be avoided.  This
+ * warning only occurs if your program actually uses tmpnam() like this
+ * test program does.  Indeed, it is a good idea to use some other
+ * method for temporary files, but unfortunately there is nothing that
+ * is easily portable.  This problem is left for some other module to
+ * handle.  (Since this program never actually attempts to use any of
+ * the generated temporary file paths, it is not dangerous.)
+ * 
+ * NOTE 2: Define AKS_FILE64 while compiling to test the 64-bit file
+ * functions.  Be sure to pass a file parameter to fully test this
+ * functionality!
+ * 
+ * NOTE 3: The echo with UTF-8 test may not display the proper Unicode
+ * characters on POSIX, depending on whether the shell is interpreting
+ * UTF-8 or not.
  * 
  * The program begins by setting binary mode on standard input and text
  * mode on standard output using the portable macro functions.  Then, it
- * prints the platform determined by the macro definitions.  It also
- * tests the tmpnam wrapper.  (You may get a warning on some platforms
- * that tmpnam() is dangerous.)  Also, seterr.
+ * prints the platform determined by the macro definitions.  Finally, it
+ * tests various functions.
  * 
  * Finally, if a path is given as the first and only command-line 
  * argument, the test program gets the length of the file using the
@@ -30,6 +44,7 @@
 
 /* Other includes */
 #include <stdio.h>
+#include <stdlib.h>
 
 /* (Translated) program entrypoint */
 static int maint(int argc, char *argv[]) {
@@ -37,6 +52,7 @@ static int maint(int argc, char *argv[]) {
   FILE *fh = NULL;
   char tfile[L_tmpnam + 1];
   char *pResult = NULL;
+  const char *pVar = NULL;
 #ifdef AKS_FILE64
   aks_off64 fs = 0;
 #else
@@ -88,10 +104,35 @@ static int maint(int argc, char *argv[]) {
   /* Clear the error setting */
   aks_seterr(EINVAL);
   if (errno == EINVAL) {
-    printf("Error setting test completed.\n");
+    printf("Seterr test passed.\n");
   } else {
-    printf("Error setting test FAILED.\n");
+    printf("Seterr test FAILED.\n");
   }
+  aks_seterr(0);
+  
+  /* Try to get the PATH environment variable */
+  pVar = getenvt("PATH");
+  if (pVar != NULL) {
+    printf("PATH is: %s\n", pVar);
+  } else {
+    printf("Failed to query PATH environment variable!\n");
+  }
+  
+  /* Try to use the system() command */
+#ifdef AKS_POSIX
+  printf("Attempting system echo command with UTF-8...\n");
+  systemt(
+    "echo Hello there from echo sch\xc3\xb6" "ne F\xc3\xbc" "chse");
+#else
+#ifdef AKS_WIN_WAPI
+  printf("Attempting system echo command with UTF-8...\n");
+  systemt(
+    "echo Hello there from echo sch\xc3\xb6" "ne F\xc3\xbc" "chse");
+#else
+  printf("Attempting system echo command, no UTF-8...\n");
+  systemt("echo Hello there from echo");
+#endif
+#endif
   
   /* Check if a parameter was given */
   if (argc == 2) {
