@@ -164,13 +164,30 @@ On POSIX and on Windows in ANSI mode, these functions just make a dynamic string
 
 If you are writing C programs that seek to be portable between POSIX and Windows, you should stay as close as possible to ANSI C (C89/C90).  Microsoft has traditionally been very slow at updating C language support in their compilers.  Furthermore, there are certain sections of the ANSI C standard that are problematic and should be avoided in modern applications, even if they are part of the ANSI C standard.
 
-The following subsections have specifics about what parts of ANSI C to avoid.
+The following subsections have specifics about portability issues within ANSI C.
 
 ### Unsafe string reading
 
 The ANSI C function `gets()` is highly vulnerable to buffer overruns.  POSIX standards discourage use of this function for that reason.  Windows has dropped the function entirely due to security concerns.
 
 In short, do not use `gets()`!
+
+### Setting errno
+
+Many of the standard C functions use a global variable named `errno` that is defined in `<errno.h>` to return error status codes.  This is a problem for multithreading (which is not part of ANSI C), because it makes most of the C standard library thread-unsafe.  To solve this problem, both POSIX and Windows adjust `errno` to actually be a thread-specific variable that has a different identity on each thread.  This allows single-threaded code to work as before, and multithreaded code can still use the C standard library.
+
+The only catch is when _writing_ to `errno`.  This will work correctly on POSIX.  However, this may cause problems on Windows due to the way `errno` is implemented in the Windows C runtime.  A Windows-specific function `_set_errno` defined in `<stdlib.h>` is supposed to be used instead of directly setting the (fake) global variable.  (Reading directly from `errno` still works on Windows.)
+
+If `AKS_SETERR` is defined when `aksmacro.h` is included, then the following macro function will be defined:
+
+    void aks_seterr(int err)
+    ------------------------
+    
+    Parameters:
+    
+      err - the value to write to errno
+
+On POSIX, this macro just assigns `err` to `errno`.  On Windows, the special `_set_errno` function will be used to properly set the error code.  `<errno.h>` will be included on both platforms if `AKS_SETERR` is defined, and on Windows `<stdlib.h>` will also be included.
 
 ### Locale-related functions
 
