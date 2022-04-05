@@ -8,7 +8,9 @@
  * 
  * The program begins by setting binary mode on standard input and text
  * mode on standard output using the portable macro functions.  Then, it
- * prints the platform determined by the macro definitions.
+ * prints the platform determined by the macro definitions.  It also
+ * tests the tmpnam wrapper.  (You may get a warning on some platforms
+ * that tmpnam() is dangerous.)
  * 
  * Finally, if a path is given as the first and only command-line 
  * argument, the test program gets the length of the file using the
@@ -32,6 +34,8 @@
 static int maint(int argc, char *argv[]) {
 
   FILE *fh = NULL;
+  char tfile[L_tmpnam + 1];
+  char *pResult = NULL;
 #ifdef AKS_FILE64
   aks_off64 fs = 0;
 #else
@@ -64,6 +68,21 @@ static int maint(int argc, char *argv[]) {
 #ifdef AKS_WIN_WCRT
   printf("Win32 wide character CRT detected.\n");
 #endif
+  
+  /* Test tmpnam facility */
+  pResult = tmpnamt(NULL);
+  if (pResult != NULL) {
+    printf("tmpnam test 1 result: %s\n", pResult);
+  } else {
+    printf("tmpnam test 1 FAILED.\n");
+  }
+  
+  pResult = tmpnamt(tfile);
+  if (pResult != NULL) {
+    printf("tmpnam test 2 result: %s\n", tfile);
+  } else {
+    printf("tmpnam test 2 FAILED.\n");
+  }
   
   /* Check if a parameter was given */
   if (argc == 2) {
