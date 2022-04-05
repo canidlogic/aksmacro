@@ -394,7 +394,7 @@ static char *aks_fromapi(const aks_tchar *pStr) {
 }
 
 /*
- * On Windows in ANSI mode, the translation functions must handle
+ * On Windows in Unicode mode, the translation functions must handle
  * parameter conversions and call the wide-character versions.
  */
 static int removet(const char *f) {
