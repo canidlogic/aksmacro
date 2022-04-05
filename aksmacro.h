@@ -66,6 +66,24 @@
 
 /* * * * * * * *
  *             *
+ * Mode macros *
+ *             *
+ * * * * * * * */
+
+/* Define Windows-specific macros for detecting API and CRT Unicode
+ * mode */
+#ifdef AKS_WIN
+#ifdef UNICODE
+#define AKS_WIN_WAPI
+#endif
+
+#ifdef _UNICODE
+#define AKS_WIN_WCRT
+#endif
+#endif
+
+/* * * * * * * *
+ *             *
  * ANSI check  *
  *             *
  * * * * * * * */
