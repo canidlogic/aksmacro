@@ -223,8 +223,7 @@ typedef char aks_tchar;
 /*
  * Convert an 8-bit string to a generic string.
  * 
- * On POSIX, this just makes a dynamic copy of the string.  If NULL is
- * passed, NULL is returned.
+ * On POSIX, this just makes a dynamic copy of the string.
  * 
  * Parameters:
  * 
@@ -232,7 +231,7 @@ typedef char aks_tchar;
  * 
  * Return:
  * 
- *   the dynamically allocated generic string copy
+ *   the dynamically allocated generic string copy, or NULL if error
  */
 static aks_tchar *aks_toapi(const char *pStr) {
   
@@ -243,12 +242,11 @@ static aks_tchar *aks_toapi(const char *pStr) {
     
     /* Allocate copy */
     pResult = (aks_tchar *) malloc(strlen(pStr) + 1);
-    if (pResult == NULL) {
-      abort();
-    }
     
     /* Perform copy operation */
-    strcpy(pResult, pStr);
+    if (pResult != NULL) {
+      strcpy(pResult, pStr);
+    }
   }
   
   /* Return result */
@@ -258,8 +256,7 @@ static aks_tchar *aks_toapi(const char *pStr) {
 /*
  * Convert a generic string to an 8-bit string.
  * 
- * On POSIX, this just makes a dynamic copy of the string.  If NULL is
- * passed, NULL is returned.
+ * On POSIX, this just makes a dynamic copy of the string.
  * 
  * Parameters:
  * 
@@ -267,7 +264,7 @@ static aks_tchar *aks_toapi(const char *pStr) {
  * 
  * Return:
  * 
- *   the dynamically allocated 8-bit string copy
+ *   the dynamically allocated 8-bit string copy, or NULL if error
  */
 static char *aks_fromapi(const aks_tchar *pStr) {
   
@@ -278,12 +275,11 @@ static char *aks_fromapi(const aks_tchar *pStr) {
     
     /* Allocate copy */
     pResult = (char *) malloc(strlen(pStr) + 1);
-    if (pResult == NULL) {
-      abort();
-    }
     
     /* Perform copy operation */
-    strcpy(pResult, pStr);
+    if (pResult != NULL) {
+      strcpy(pResult, pStr);
+    }
   }
   
   /* Return result */
@@ -351,27 +347,24 @@ static aks_tchar *aks_toapi(const char *pStr) {
           -1,
           NULL,
           0);
-    if (sz < 1) {
-      /* Conversion failed */
-      return NULL;
-    }
     
     /* Allocate buffer for copy */
-    pResult = (aks_tchar *) calloc((size_t) sz, sizeof(aks_tchar));
-    if (pResult == NULL) {
-      abort();
+    if (sz > 0) {
+      pResult = (aks_tchar *) calloc((size_t) sz, sizeof(aks_tchar));
     }
     
     /* Perform the translation */
-    if (MultiByteToWideChar(
-          CP_UTF8,
-          MB_ERR_INVALID_CHARS,
-          pStr,
-          -1,
-          pResult,
-          sz) != sz) {
-      /* Shouldn't happen because we already did conversion earlier */
-      abort();
+    if (pResult != NULL) {
+      if (MultiByteToWideChar(
+            CP_UTF8,
+            MB_ERR_INVALID_CHARS,
+            pStr,
+            -1,
+            pResult,
+            sz) != sz) {
+        free(pResult);
+        pResult = NULL;
+      }
     }
   }
   
@@ -413,29 +406,26 @@ static char *aks_fromapi(const aks_tchar *pStr) {
           0,
           NULL,
           NULL);
-    if (sz < 1) {
-      /* Conversion failed */
-      return NULL;
-    }
     
     /* Allocate buffer for copy */
-    pResult = (char *) malloc((size_t) sz);
-    if (pResult == NULL) {
-      abort();
+    if (sz > 0) {
+      pResult = (char *) malloc((size_t) sz);
     }
     
     /* Perform the translation */
-    if (WideCharToMultiByte(
-          CP_UTF8,
-          WC_ERR_INVALID_CHARS,
-          pStr,
-          -1,
-          pResult,
-          sz,
-          NULL,
-          NULL) != sz) {
-      /* Shouldn't happen because we already did conversion earlier */
-      abort();
+    if (pResult != NULL) {
+      if (WideCharToMultiByte(
+            CP_UTF8,
+            WC_ERR_INVALID_CHARS,
+            pStr,
+            -1,
+            pResult,
+            sz,
+            NULL,
+            NULL) != sz) {
+        free(pResult);
+        pResult = NULL;
+      }
     }
   }
   
@@ -453,13 +443,14 @@ static int removet(const char *f) {
   int result = 0;
   
   tf = aks_toapi(f);
-  if (tf == NULL) {
-    aks_seterr(EINVAL);
-    return -1;
-  }
   
-  result = _wremove(tf);
-  free(tf);
+  if (tf != NULL) {
+    result = _wremove(tf);
+    free(tf);
+  } else {
+    aks_seterr(EINVAL);
+    result = -1;
+  }
   
   return result;
 }
@@ -470,23 +461,23 @@ static int renamet(const char *t, const char *v) {
   int result = 0;
   
   tt = aks_toapi(t);
-  tv = aks_toapi(v);
   
-  if ((tt == NULL) || (tv == NULL)) {
-    if (tt != NULL) {
+  if (tt != NULL) {
+    tv = aks_toapi(v);
+    if (tv == NULL) {
       free(tt);
+      tt = NULL;
     }
-    if (tv != NULL) {
-      free(tv);
-    }
-    
-    aks_seterr(EINVAL);
-    return -1;
   }
   
-  result = _wrename(tt, tv);
-  free(tt);
-  free(tv);
+  if ((tt != NULL) && (tv != NULL)) {
+    result = _wrename(tt, tv);
+    free(tt);
+    free(tv);
+  } else {
+    aks_seterr(EINVAL);
+    result = -1;
+  }
   
   return result;
 }
@@ -497,61 +488,48 @@ static char *tmpnamt(char *s) {
   
   aks_tchar *tbuf = NULL;
   aks_tchar *result = NULL;
+  char *retval = NULL;
   static char *pb = NULL;
   
   /* Different implementation depending on whether a result buffer was
    * passed */
   if (s != NULL) {
-    /* Result buffer passed, so first we want to dynamically allocate a
-     * wide buffer to get the result from the API call */
-    tbuf = (aks_tchar *) calloc(L_tmpnam + 1, sizeof(aks_tchar));
-    if (tbuf == NULL) {
-      abort();
-    }
+    /* Result buffer passed, begin by setting an empty string result in
+     * case of error */
+    c[0] = (char) 0;
     
-    /* Now call through with the buffer and check for error */
-    if (_wtmpnam(tbuf) != NULL) {
-      /* Call-through passed, so get a UTF-8 conversion */
-      result = aks_fromapi(tbuf);
-      if (result == NULL) {
-        /* Problem with UTF-8 conversion, so free the wide buffer, set
-         * an empty string result, and return NULL */
-        free(tbuf);
-        tbuf = NULL;
-        s[0] = (char) 0;
-        return NULL;
+    /* First we want to dynamically allocate a wide buffer to get the
+     * result from the API call */
+    tbuf = (aks_tchar *) calloc(L_tmpnam + 1, sizeof(aks_tchar));
+    
+    /* Only proceed if allocation succeeded */
+    if (tbuf != NULL) {
+    
+      /* Now call through with the buffer and only proceed if
+       * successful */
+      if (_wtmpnam(tbuf) != NULL) {
+        /* Call-through passed, so get a UTF-8 conversion */
+        retval = aks_fromapi(tbuf);
+        
+        /* If length of UTF-8 conversion is L_tmpnam or greater then we
+         * don't have enough space in the passed buffer so free the
+         * conversion */
+        if (retval != NULL) {
+          if (strlen(retval) >= L_tmpnam) {
+            free(retval);
+            retval = NULL;
+          }
+        }
+        
+        /* We checked the length so copy the UTF-8 conversion into the
+         * passed buffer, free the conversion buffer, and set the return
+         * value to the passed buffer */
+        if (retval != NULL) {
+          strcpy(s, retval);
+          free(retval);
+          retval = s;
+        }
       }
-      
-      /* We can now free the wide buffer */
-      free(tbuf);
-      tbuf = NULL;
-      
-      /* If length of UTF-8 conversion is L_tmpnam or greater then we
-       * don't have enough space in the passed buffer so free the
-       * conversion, set an empty string result, and return NULL */
-      if (strlen(result) >= L_tmpnam) {
-        free(result);
-        result = NULL;
-        s[0] = (char) 0;
-        return NULL;
-      }
-      
-      /* We checked the length so copy the UTF-8 conversion into the
-       * passed buffer and free the conversion buffer */
-      strcpy(s, result);
-      free(result);
-      result = NULL;
-      
-      /* Return the passed buffer */
-      return s;
-      
-    } else {
-      /* Call-through failed, so free the wide buffer, set an empty
-       * string result, and return NULL */
-      free(tbuf);
-      tbuf = NULL;
-      s[0] = (char) 0;
-      return NULL;
     }
     
   } else {
@@ -570,8 +548,17 @@ static char *tmpnamt(char *s) {
     pb = aks_fromapi(result);
     
     /* Return the static buffer simulation */
-    return pb;
+    retval = pb;
   }
+  
+  /* Free tbuf if allocated */
+  if (tbuf != NULL) {
+    free(tbuf);
+    tbuf = NULL;
+  }
+  
+  /* Return retval */
+  return retval;
 }
 
 static FILE *fopent(const char *f, const char *m) {
@@ -580,23 +567,23 @@ static FILE *fopent(const char *f, const char *m) {
   FILE *result = NULL;
   
   tf = aks_toapi(f);
-  tm = aks_toapi(m);
   
-  if ((tf == NULL) || (tm == NULL)) {
-    if (tf != NULL) {
+  if (tf != NULL) {
+    tm = aks_toapi(m);
+    if (tm == NULL) {
       free(tf);
+      tf = NULL;
     }
-    if (tm != NULL) {
-      free(tm);
-    }
-    
-    aks_seterr(EINVAL);
-    return NULL;
   }
   
-  result = _wfopen(tf, tm);
-  free(tf);
-  free(tm);
+  if ((tf != NULL) && (tm != NULL)) {
+    result = _wfopen(tf, tm);
+    free(tf);
+    free(tm);
+  } else {
+    aks_seterr(EINVAL);
+    result = NULL;
+  }
   
   return result;
 }
@@ -607,26 +594,26 @@ static FILE *freopent(const char *f, const char *m, FILE *s) {
   FILE *result = NULL;
   
   tf = aks_toapi(f);
-  tm = aks_toapi(m);
   
-  if ((tf == NULL) || (tm == NULL)) {
-    if (tf != NULL) {
+  if (tf != NULL) {
+    tm = aks_toapi(m);
+    if (tm == NULL) {
       free(tf);
+      tf = NULL;
     }
-    if (tm != NULL) {
-      free(tm);
-    }
-    
+  }
+  
+  if ((tf != NULL) && (tm != NULL)) {
+    result = _wfreopen(tf, tm, s);
+    free(tf);
+    free(tm);
+  } else {
     /* We also need to close the given handle, per the interface
      * definition */
     fclose(s);
     aks_seterr(EINVAL);
-    return NULL;
+    result = NULL;
   }
-  
-  result = _wfreopen(tf, tm, s);
-  free(tf);
-  free(tm);
   
   return result;
 }
@@ -645,19 +632,17 @@ static char *getenvt(const char *n) {
     pb = NULL;
   }
   
-  /* Convert parameter; just return NULL if conversion fails or if we
-   * were passed NULL to begin with */
+  /* Convert parameter */
   tn = aks_toapi(n);
-  if (tn == NULL) {
-    return NULL;
-  }
   
   /* Call through with translated parameter and then free it */
-  result = _wgetenv(tn);
-  free(tn);
+  if (tn != NULL) {
+    result = _wgetenv(tn);
+    free(tn);
+  }
   
-  /* Translate return value into simulated static buffer; if return
-   * value was NULL, the translation will also be NULL */
+  /* Translate return value into simulated static buffer; NULL will be
+   * set if there was any problem */
   pb = aks_fromapi(result);
   
   /* Return the translated result or NULL */
@@ -669,13 +654,14 @@ static int systemt(const char *s) {
   int result = 0;
   
   ts = aks_toapi(s);
-  if (ts == NULL) {
-    aks_seterr(EINVAL);
-    return -1;
-  }
   
-  result = _wsystem(ts);
-  free(ts);
+  if (ts != NULL) {
+    result = _wsystem(ts);
+    free(ts);
+  } else {
+    aks_seterr(EINVAL);
+    result = -1;
+  }
   
   return result;
 }
@@ -697,7 +683,7 @@ typedef char aks_tchar;
  * Convert an 8-bit string to a generic string.
  * 
  * On Windows in ANSI mode, this just makes a dynamic copy of the
- * string.  If NULL is passed, NULL is returned.
+ * string.
  * 
  * Parameters:
  * 
@@ -705,7 +691,7 @@ typedef char aks_tchar;
  * 
  * Return:
  * 
- *   the dynamically allocated generic string copy
+ *   the dynamically allocated generic string copy, or NULL if error
  */
 static aks_tchar *aks_toapi(const char *pStr) {
   
@@ -716,12 +702,11 @@ static aks_tchar *aks_toapi(const char *pStr) {
     
     /* Allocate copy */
     pResult = (aks_tchar *) malloc(strlen(pStr) + 1);
-    if (pResult == NULL) {
-      abort();
-    }
     
     /* Perform copy operation */
-    strcpy(pResult, pStr);
+    if (pResult != NULL) {
+      strcpy(pResult, pStr);
+    }
   }
   
   /* Return result */
@@ -732,7 +717,7 @@ static aks_tchar *aks_toapi(const char *pStr) {
  * Convert a generic string to an 8-bit string.
  * 
  * On Windows in ANSI mode, this just makes a dynamic copy of the
- * string.  If NULL is passed, NULL is returned.
+ * string.
  * 
  * Parameters:
  * 
@@ -740,7 +725,7 @@ static aks_tchar *aks_toapi(const char *pStr) {
  * 
  * Return:
  * 
- *   the dynamically allocated 8-bit string copy
+ *   the dynamically allocated 8-bit string copy, or NULL if error
  */
 static char *aks_fromapi(const aks_tchar *pStr) {
   
@@ -751,12 +736,11 @@ static char *aks_fromapi(const aks_tchar *pStr) {
     
     /* Allocate copy */
     pResult = (char *) malloc(strlen(pStr) + 1);
-    if (pResult == NULL) {
-      abort();
-    }
     
     /* Perform copy operation */
-    strcpy(pResult, pStr);
+    if (pResult != NULL) {
+      strcpy(pResult, pStr);
+    }
   }
   
   /* Return result */
@@ -820,31 +804,65 @@ int wmain(int argc, wchar_t *argv[]) {
   char **ppa = NULL;
   int last_i = 0;
   int i = 0;
+  int retval = 0;
   
   /* Only proceed with translation if argv is not NULL */
   if (argv != NULL) {
-    /* Determine the index of the final NULL in the array */
-    for( ; argv[last_i] != NULL; last_i++);
+    /* Determine the index of the final NULL in the array, and make sure
+     * we aren't exceeding argc */
+    for( ; argv[last_i] != NULL; last_i++) {
+      if (last_i >= argc) {
+        fprintf(stderr, "Invalid main invocation!\n");
+        last_i = -1;
+        break;
+      }
+    }
     
     /* Allocate an array of character pointers for the translation */
-    ppa = (char **) calloc((size_t) (last_i + 1), sizeof(char *));
-    if (ppa == NULL) {
-      abort();
+    if (last_i >= 0) {
+      ppa = (char **) calloc((size_t) (last_i + 1), sizeof(char *));
+      if (ppa == NULL) {
+        fprintf(stderr, "Out of memory!\n");
+      }
     }
     
     /* Initialize all pointers in the array copy to NULL */
-    for(i = 0; i <= last_i; i++) {
-      ppa[i] = NULL;
+    if (ppa != NULL) {
+      for(i = 0; i <= last_i; i++) {
+        ppa[i] = NULL;
+      }
     }
     
     /* Translate each argument */
-    for(i = 0; i < last_i; i++) {
-      ppa[i] = aks_fromapi(argv[i]);
+    if (ppa != NULL) {
+      for(i = 0; i < last_i; i++) {
+        ppa[i] = aks_fromapi(argv[i]);
+        if (ppa[i] == NULL) {
+          fprintf(stderr, "Translation in main failed!\n");
+          for(i--; i >= 0; i--) {
+            free(ppa[i]);
+            ppa[i] = NULL;
+          }
+          free(ppa);
+          ppa = NULL;
+          break;
+        }
+      }
     }
   }
   
-  /* Call through with translated arguments */
-  return maint(argc, ppa);
+  /* Call through with translated arguments, or set result to failure if
+   * we encountered an error before this */
+  if (argv == NULL) {
+    retval = maint(argc, NULL);
+  } else if (ppa != NULL) {
+    retval = maint(argc, ppa);
+  } else {
+    retval = EXIT_FAILURE;
+  }
+  
+  /* Return the return value */
+  return retval;
 }
 
 #else
